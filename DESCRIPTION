@@ -1,0 +1,11 @@
+Package: segmentation
+Type: Package
+Title: Implements PCF and MultiPCF for segmentation of sequence data
+Version: 1.0
+Date: 2020-11-10
+Author: Kevin Gori
+Maintainer: Kevin Gori <kcg25@cam.ac.uk>
+Description: "segmentation" reimplements the PCF and MultiPCF algorithms from the package "copynumber", but uses C++ to increase speed and decrease memory requirements.
+License: MIT
+Imports: Rcpp (>= 1.0.5)
+LinkingTo: Rcpp

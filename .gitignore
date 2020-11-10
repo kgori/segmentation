@@ -1,0 +1,7 @@
+*.o
+*.so
+*.dylib
+*.a
+
+*.Rproj
+.Rproj.user

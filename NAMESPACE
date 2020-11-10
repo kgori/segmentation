@@ -1,0 +1,4 @@
+useDynLib(segmentation, .registration=TRUE)
+importFrom(Rcpp, evalCpp)
+export(pcf)
+export(multipcf)
