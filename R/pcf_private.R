@@ -64,7 +64,7 @@ runFastMultiPCFCpp <- function (x, gamma, L, frac1, frac2, yest)
     }
 }
 
-runMultiPCFSubsetCpp <- function (x, gamma, L, frac1, frac2, yest)
+runMultiPcfSubsetCpp <- function (x, gamma, L, frac1, frac2, yest)
 {
     SUBSIZE <- 5000
     antGen <- nrow(x)
