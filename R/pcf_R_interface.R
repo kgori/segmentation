@@ -47,6 +47,11 @@ multipcf <- function(x, gamma) {
         stop ("Data is too small to segment")
     }
     
+    # Scale up the gamma by multiplying by the number of samples.
+    # This makes gamma values provided to pcf and multipcf have similar effects
+    # on the amount of segmentation.
+    gamma <- gamma * ncol(x)
+    
     sd <- apply(x, 2, getMad)
     x <- sweep(x, 2, sd, "/")
     nrow_x <- nrow(x)
