@@ -9,3 +9,4 @@ Description: "segmentation" reimplements the PCF and MultiPCF algorithms from th
 License: MIT
 Imports: Rcpp (>= 1.0.5)
 LinkingTo: Rcpp
+RoxygenNote: 7.1.1

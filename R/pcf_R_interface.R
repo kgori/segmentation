@@ -1,4 +1,7 @@
-#'
+#' Segment a single sample using the PCF algorithm.
+#' @param x Vector of observations
+#' @param kmin Minimum number of data points permitted in a single segment
+#' @param gamma Penalty parameter. Higher values produce fewer segments.
 #' @export
 pcf <- function(x, kmin, gamma) {
     if (any(is.na(x) | is.nan(x) | is.infinite(x))) {
@@ -31,7 +34,9 @@ pcf <- function(x, kmin, gamma) {
     result
 }
 
-#'
+#' Segment multiple samples simultaneously using the MultiPCF algorithm.
+#' @param x Matrix of observations (samples arranged as columns)
+#' @param gamma Penalty parameter. Higher values produce fewer segments.
 #' @export
 multipcf <- function(x, gamma) {
     if (any(is.na(x) | is.nan(x) | is.infinite(x))) {
