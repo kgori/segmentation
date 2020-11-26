@@ -4,12 +4,17 @@
 \alias{multipcf}
 \title{Segment multiple samples simultaneously using the MultiPCF algorithm.}
 \usage{
-multipcf(x, gamma)
+multipcf(x, gamma, w = NULL)
 }
 \arguments{
 \item{x}{Matrix of observations (samples arranged as columns)}
 
 \item{gamma}{Penalty parameter. Higher values produce fewer segments.}
+
+\item{w}{Optional vector of weights to apply to the data before segmenting.
+Allows down-weighting of noisy samples to avoid them contributing excessively
+and causing the result to be over-segmented. Must be a numeric vector the same
+length as the number of columns of x.}
 }
 \description{
 Segment multiple samples simultaneously using the MultiPCF algorithm.

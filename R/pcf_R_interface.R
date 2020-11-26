@@ -37,14 +37,24 @@ pcf <- function(x, kmin, gamma) {
 #' Segment multiple samples simultaneously using the MultiPCF algorithm.
 #' @param x Matrix of observations (samples arranged as columns)
 #' @param gamma Penalty parameter. Higher values produce fewer segments.
+#' @param w Optional vector of weights to apply to the data before segmenting.
+#' Allows down-weighting of noisy samples to avoid them contributing excessively
+#' and causing the result to be over-segmented. Must be a numeric vector the same
+#' length as the number of columns of x.
 #' @export
-multipcf <- function(x, gamma) {
+multipcf <- function(x, gamma, w = NULL) {
     if (any(is.na(x) | is.nan(x) | is.infinite(x))) {
         stop("Data is not permitted to have NA, NaN or infinite values")
     }
     
     if (nrow(x) < 15) {
         stop ("Data is too small to segment")
+    }
+    
+    if (is.null(w)) w <- rep(1.0, ncol(x))
+    stopifnot(is.numeric(w))
+    if(!(length(w) == ncol(x))) {
+        stop ("Weights vector wrong size - must have length equal to number of columns of x")
     }
     
     # Scale up the gamma by multiplying by the number of samples.
@@ -54,6 +64,7 @@ multipcf <- function(x, gamma) {
     
     sd <- apply(x, 2, getMad)
     x <- sweep(x, 2, sd, "/")
+    x <- sweep(x, 2, w, "*")
     nrow_x <- nrow(x)
     if (nrow_x < 1000) {
         result <- runFastMultiPCFCpp(x, gamma, 15, 0.15, 0.15, FALSE)
@@ -68,6 +79,7 @@ multipcf <- function(x, gamma) {
             }
         }
     }
+    result$mean <- sweep(result$mean, 1, w, "/")
     result$mean <- sweep(result$mean, 1, sd, "*")
     result
 }
