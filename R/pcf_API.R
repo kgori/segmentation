@@ -83,3 +83,20 @@ multipcf <- function(x, gamma, w = NULL) {
     result$mean <- sweep(result$mean, 1, sd, "*")
     result
 }
+
+#' PCF algorithm, but the algorithm can only place breakpoints at the indices
+#' listed in `breakpoints`
+#' @export
+restricted_pcf <- function(x, breakpoints, kmin, gamma) {
+    sd <- getMad(x, 25)
+    adjusted_gamma <- gamma * sd * sd
+    
+    mark <- vector(length = length(x))
+    breakpoints <- breakpoints[breakpoints > 0 & breakpoints <= length(x)]
+    mark[breakpoints-1] <- TRUE
+    mark[length(mark)] <- TRUE
+    dense <- compactCpp(x, mark)
+    result <- PottsCompactCpp(kmin, adjusted_gamma, dense$Nr, dense$Sum,
+                              FALSE)
+    return (result)
+}
