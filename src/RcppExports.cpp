@@ -5,6 +5,11 @@
 
 using namespace Rcpp;
 
+#ifdef RCPP_USE_GLOBAL_ROSTREAM
+Rcpp::Rostream<true>&  Rcpp::Rcout = Rcpp::Rcpp_cout_get();
+Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
+#endif
+
 // Crossprod
 NumericVector::elem_type Crossprod(const NumericVector& x, const NumericVector& y);
 RcppExport SEXP _segmentation_Crossprod(SEXP xSEXP, SEXP ySEXP) {
@@ -184,6 +189,33 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// exact_pcf_
+std::vector<int> exact_pcf_(const std::vector<double>& y, unsigned int kmin, double gamma);
+RcppExport SEXP _segmentation_exact_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< unsigned int >::type kmin(kminSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(exact_pcf_(y, kmin, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
+// fast_pcf_
+std::vector<int> fast_pcf_(const std::vector<double>& y, const std::vector<int>& available_breakpoints, int kmin, double gamma);
+RcppExport SEXP _segmentation_fast_pcf_(SEXP ySEXP, SEXP available_breakpointsSEXP, SEXP kminSEXP, SEXP gammaSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type y(ySEXP);
+    Rcpp::traits::input_parameter< const std::vector<int>& >::type available_breakpoints(available_breakpointsSEXP);
+    Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
+    Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
+    rcpp_result_gen = Rcpp::wrap(fast_pcf_(y, available_breakpoints, kmin, gamma));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_segmentation_Crossprod", (DL_FUNC) &_segmentation_Crossprod, 2},
@@ -199,6 +231,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_segmentation_PottsCompactCpp", (DL_FUNC) &_segmentation_PottsCompactCpp, 5},
     {"_segmentation_findMarksCpp", (DL_FUNC) &_segmentation_findMarksCpp, 3},
     {"_segmentation_markWithPottsCpp", (DL_FUNC) &_segmentation_markWithPottsCpp, 5},
+    {"_segmentation_exact_pcf_", (DL_FUNC) &_segmentation_exact_pcf_, 3},
+    {"_segmentation_fast_pcf_", (DL_FUNC) &_segmentation_fast_pcf_, 4},
     {NULL, NULL, 0}
 };
 

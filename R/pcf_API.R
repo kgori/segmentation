@@ -100,3 +100,36 @@ restricted_pcf <- function(x, breakpoints, kmin, gamma) {
                               FALSE)
     return (result)
 }
+
+#' Reimplementation of exact PCF
+#' @export
+exact_pcf <- function(x, kmin, gamma) {
+    sd <- getMad(x, 25)
+    adjusted_gamma <- gamma * sd * sd
+    starts <- exact_pcf_(x, kmin, adjusted_gamma) + 1
+    ends <- c(starts[starts > 1] - 1, length(x))
+    lengths <- ends - starts + 1
+    means <- sapply(seq_along(starts), function(i) {
+        mean(x[starts[i]:ends[i]])
+    })
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' Reimplementation of fast PCF
+#' @export
+fast_pcf <- function(x, kmin, gamma) {
+    sd <- getMad(x, 25)
+    adjusted_gamma <- gamma * sd * sd
+    
+    k <- c(rep(-1, 8), rep(-2, 16), rep(2, 16), rep(1, 8))
+    peaks <- (convolve(x, k, type = "open")[(1+length(k)/2):(length(d)+length(k)/2)])/sum(abs(k))
+    mark <- which(abs(peaks) > median(abs(peaks)) + mad(abs(peaks)))
+    
+    starts <- fast_pcf_(x, mark, kmin, adjusted_gamma) + 1
+    ends <- c(starts[starts > 1] - 1, length(x))
+    lengths <- ends - starts + 1
+    means <- sapply(seq_along(starts), function(i) {
+        mean(x[starts[i]:ends[i]])
+    })
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}

@@ -53,3 +53,11 @@ markWithPottsCpp <- function(kmin, gamma, nr, res, subsize) {
     .Call(`_segmentation_markWithPottsCpp`, kmin, gamma, nr, res, subsize)
 }
 
+exact_pcf_ <- function(y, kmin, gamma) {
+    .Call(`_segmentation_exact_pcf_`, y, kmin, gamma)
+}
+
+fast_pcf_ <- function(y, available_breakpoints, kmin, gamma) {
+    .Call(`_segmentation_fast_pcf_`, y, available_breakpoints, kmin, gamma)
+}
+
