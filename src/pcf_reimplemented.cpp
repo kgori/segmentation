@@ -141,3 +141,58 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, const std::vector<int> 
     std::reverse(starts.begin(), starts.end());
     return starts;
 }
+
+// [[Rcpp::export]]
+std::vector<double> convolve_(const std::vector<double>& x, const std::vector<double>& k) {
+    int nx = x.size();
+    int nk = k.size();
+    std::vector<double> out(nx + nk - 1, 0);
+    for (int i = 0; i < nx; ++i) {
+        for (int j = 0; j < nk; ++j) {
+            out[i+j] += x[i] * k[j];
+        }
+    }
+    return std::vector<double>(out.begin() + nk / 2 - 1, out.end() - nk / 2);
+}
+
+// [[Rcpp::export]]
+double median_(NumericVector x) {
+    NumericVector y = clone(x);
+    int n, half;
+    double y1, y2;
+    n = y.size();
+    half = n / 2;
+    if(n % 2 == 1) {
+        // median for odd length vector
+        std::nth_element(y.begin(), y.begin()+half, y.end());
+        return y[half];
+    } else {
+        // median for even length vector
+        std::nth_element(y.begin(), y.begin()+half, y.end());
+        y1 = y[half];
+        std::nth_element(y.begin(), y.begin()+half-1, y.begin()+half);
+        y2 = y[half-1];
+        return (y1 + y2) / 2.0;
+    }
+}
+
+// [[Rcpp::export]]
+double mad_(NumericVector x, double scale_factor = 1.4826) {
+    // scale_factor = 1.4826; default for normal distribution consistent with R
+    return median_(abs(x - median_(x))) * scale_factor;
+}
+
+// [[Rcpp::export]]
+std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0) {
+    std::vector<double> k{-1, -1, -2, -2, -2, -2, 2, 2, 2, 2, 1, 1};
+    NumericVector hpf = Rcpp::wrap(convolve_(x, k));
+    NumericVector abshpf = abs(hpf);
+    double threshold = median_(abshpf) + nmad * mad_(hpf);
+    std::vector<int> out;
+    for (int i = 0; i < abshpf.size(); ++i) {
+        if (abshpf[i] > threshold) {
+            out.push_back(i);
+        }
+    }
+    return out;
+}
