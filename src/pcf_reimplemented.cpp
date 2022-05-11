@@ -46,6 +46,7 @@ std::vector<int> exact_pcf_(const std::vector<double> &y, unsigned int kmin, dou
 struct Aggregates {
     std::vector<double> aggregates;
     std::vector<int> pos;
+    std::vector<int> pos_diff;
 };
 
 Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> r) {
@@ -79,6 +80,9 @@ Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> r) {
     std::vector<double> agg;
     agg.reserve(r.size());
     
+    std::vector<int> pos_diff;
+    pos_diff.reserve(r.size());
+    
     for (auto it = r.begin(), it2 = std::next(it);
          it != r.end() && it2 != r.end();
          ++it, ++it2) {
@@ -89,9 +93,10 @@ Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> r) {
             a += y[i];
         }
         agg.push_back(a);
+        pos_diff.push_back(end - start);
     }
     
-    return Aggregates{agg, r};
+    return Aggregates{agg, r, pos_diff};
 }
 
 // [[Rcpp::export]]
@@ -103,7 +108,6 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, const std::vector<int> 
     std::size_t N = u.size();
     std::vector<double> A(N, 0);
     std::vector<int> C(N, 0);
-    std::vector<double> D(N, 0);
     std::vector<double> S(N, 0);// Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
@@ -111,12 +115,11 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, const std::vector<int> 
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
             A[j] += u[k];
-            C[j] += r[k+1] - r[k];
+            C[j] += agg.pos_diff[k];
             if (r[j] > 0 && (r[j] < kmin || r[k] - r[j] + 1 < kmin)) {
                 S[j] = std::numeric_limits<double>::infinity();
             } else {
-                D[j] = -A[j] * A[j] / C[j];
-                S[j] = D[j] + E[j] + gamma;
+                S[j] = -A[j] * A[j] / C[j] + E[j] + gamma;
             }
         }
         
