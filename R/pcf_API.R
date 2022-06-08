@@ -141,12 +141,13 @@ mark_positions <- function(x, nmad = 1, filter_size = 4) {
     } else {
         mark <- mark_(x, nmad, filter_size)
     }
-    mark
+    mark + 1
 }
 
 #' Reimplementation of fast PCF
 #' @export
 fast_pcf <- function(x, mark, kmin, gamma) {
+    mark <- mark - 1
     sd <- getMad(x, 25)
     adjusted_gamma <- gamma * sd * sd
     
@@ -161,6 +162,7 @@ fast_pcf <- function(x, mark, kmin, gamma) {
 
 #' @export
 fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
+    mark <- mark - 1
     sds <- apply(x, 2, getMad, k = 25)
     x_ <- sweep(x, 2, sds, "/")
     if (!is.null(w)) {
@@ -178,6 +180,7 @@ fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
 
 #' @export
 expanding_fast_pcf <- function(x, mark, kmin, gamma) {
+    mark <- mark - 1
     if (length(x) < 10000) return (fast_pcf(x, mark, kmin, gamma))
     
     sd <- getMad(x, 25)
@@ -204,6 +207,7 @@ expanding_fast_pcf <- function(x, mark, kmin, gamma) {
 
 #' @export
 expanding_fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
+    mark <- mark - 1
     if (nrow(x) < 10000) return (fast_multipcf(x, mark, kmin, gamma))
     
     sds <- apply(x, 2, getMad, k = 25)
