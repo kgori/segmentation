@@ -337,8 +337,22 @@ double mad_(NumericVector x, double scale_factor = 1.4826) {
 }
 
 // [[Rcpp::export]]
-std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0) {
-    std::vector<double> k{-1, -1, -2, -2, -2, -2, 2, 2, 2, 2, 1, 1};
+std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, filter_size = 4) {
+    // Make the smoothing sawtooth filter for edge detection
+    std::vector<double> k;
+    for (int i = 0; i < filter_size; ++i) {
+        k.push_back(-1);
+    }
+    for (int i = 0; i < 2 * filter_size; ++i) {
+        k.push_back(-2);
+    }
+    for (int i = 0; i < 2 * filter_size; ++i) {
+        k.push_back(2);
+    }
+    for (int i = 0; i < filter_size; ++i) {
+        k.push_back(1);
+    }
+    
     NumericVector hpf = Rcpp::wrap(convolve_(x, k));
     NumericVector abshpf = abs(hpf);
     double threshold = median_(abshpf) + nmad * mad_(hpf);
