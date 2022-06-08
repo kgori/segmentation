@@ -53,11 +53,35 @@ markWithPottsCpp <- function(kmin, gamma, nr, res, subsize) {
     .Call(`_segmentation_markWithPottsCpp`, kmin, gamma, nr, res, subsize)
 }
 
+exact_multipcf_ <- function(y, kmin, gamma) {
+    .Call(`_segmentation_exact_multipcf_`, y, kmin, gamma)
+}
+
+fast_multipcf_ <- function(y, available_breakpoints, kmin, gamma) {
+    .Call(`_segmentation_fast_multipcf_`, y, available_breakpoints, kmin, gamma)
+}
+
 exact_pcf_ <- function(y, kmin, gamma) {
     .Call(`_segmentation_exact_pcf_`, y, kmin, gamma)
 }
 
 fast_pcf_ <- function(y, available_breakpoints, kmin, gamma) {
     .Call(`_segmentation_fast_pcf_`, y, available_breakpoints, kmin, gamma)
+}
+
+convolve_ <- function(x, k) {
+    .Call(`_segmentation_convolve_`, x, k)
+}
+
+median_ <- function(x) {
+    .Call(`_segmentation_median_`, x)
+}
+
+mad_ <- function(x, scale_factor = 1.4826) {
+    .Call(`_segmentation_mad_`, x, scale_factor)
+}
+
+mark_ <- function(x, nmad = 1.0, filter_size = 4L) {
+    .Call(`_segmentation_mark_`, x, nmad, filter_size)
 }
 

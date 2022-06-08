@@ -337,7 +337,7 @@ double mad_(NumericVector x, double scale_factor = 1.4826) {
 }
 
 // [[Rcpp::export]]
-std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, filter_size = 4) {
+std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, int filter_size = 4) {
     // Make the smoothing sawtooth filter for edge detection
     std::vector<double> k;
     for (int i = 0; i < filter_size; ++i) {

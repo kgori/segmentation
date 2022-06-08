@@ -115,15 +115,40 @@ exact_pcf <- function(x, kmin, gamma) {
     list(starts = starts, ends = ends, lengths = lengths, means = means)
 }
 
+exact_multipcf <- function(x, kmin, gamma, w = NULL) {
+    sds <- apply(x, 2, getMad, k = 25)
+    x_ <- sweep(x, 2, sds, "/")
+    if (!is.null(w)) {
+        x_ <- sweep(x_, 2, w, "*")
+    }
+    adjusted_gamma <- ncol(x) * gamma
+    starts <- exact_multipcf_(x_, kmin, adjusted_gamma) + 1
+    ends <- c(starts[starts > 1] - 1, nrow(x))
+    lengths <- ends - starts + 1
+    means <- t(sapply(seq_along(starts), function(i) {
+        colMeans(x[starts[i]:ends[i], ])
+    }))
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' @export
+mark_positions <- function(x, nmad = 1, filter_size = 4) {
+    if (is.matrix(x)) {
+        mark <- sort(Reduce(union,
+                            apply(x, 2, mark_,
+                                  nmad = nmad,
+                                  filter_size = filter_size)))
+    } else {
+        mark <- mark_(x, nmad, filter_size)
+    }
+    mark
+}
+
 #' Reimplementation of fast PCF
 #' @export
-fast_pcf <- function(x, kmin, gamma) {
+fast_pcf <- function(x, mark, kmin, gamma) {
     sd <- getMad(x, 25)
     adjusted_gamma <- gamma * sd * sd
-    
-    k <- c(rep(-1, 8), rep(-2, 16), rep(2, 16), rep(1, 8))
-    peaks <- (convolve(x, k, type = "open")[(1+length(k)/2):(length(d)+length(k)/2)])/sum(abs(k))
-    mark <- which(abs(peaks) > median(abs(peaks)) + mad(abs(peaks)))
     
     starts <- fast_pcf_(x, mark, kmin, adjusted_gamma) + 1
     ends <- c(starts[starts > 1] - 1, length(x))
@@ -131,5 +156,78 @@ fast_pcf <- function(x, kmin, gamma) {
     means <- sapply(seq_along(starts), function(i) {
         mean(x[starts[i]:ends[i]])
     })
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' @export
+fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
+    sds <- apply(x, 2, getMad, k = 25)
+    x_ <- sweep(x, 2, sds, "/")
+    if (!is.null(w)) {
+        x_ <- sweep(x_, 2, w, "*")
+    }
+    adjusted_gamma <- ncol(x) * gamma
+    starts <- fast_multipcf_(x_, mark, kmin, adjusted_gamma) + 1
+    ends <- c(starts[starts > 1] - 1, nrow(x))
+    lengths <- ends - starts + 1
+    means <- t(sapply(seq_along(starts), function(i) {
+        colMeans(x[starts[i]:ends[i], ])
+    }))
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' @export
+expanding_fast_pcf <- function(x, mark, kmin, gamma) {
+    if (length(x) < 10000) return (fast_pcf(x, mark, kmin, gamma))
+    
+    sd <- getMad(x, 25)
+    adjusted_gamma <- gamma * sd * sd
+    
+    slices <- pmin(length(x), seq(5000, length(x) + 5000 - 1, 5000))
+    bks <- vector("integer")
+    for (slice_end in slices) {
+        bks <- fast_pcf_(x[1:slice_end],
+                         c(bks, mark[mark >= slice_end - 5000 &
+                                         mark < slice_end]),
+                         kmin,
+                         adjusted_gamma)
+    }
+    
+    starts <- bks + 1
+    ends <- c(starts[starts > 1] - 1, length(x))
+    lengths <- ends - starts + 1
+    means <- sapply(seq_along(starts), function(i) {
+        mean(x[starts[i]:ends[i]])
+    })
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' @export
+expanding_fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
+    if (nrow(x) < 10000) return (fast_multipcf(x, mark, kmin, gamma))
+    
+    sds <- apply(x, 2, getMad, k = 25)
+    x_ <- sweep(x, 2, sds, "/")
+    if (!is.null(w)) {
+        x_ <- sweep(x_, 2, w, "*")
+    }
+    adjusted_gamma <- ncol(x) * gamma
+    
+    slices <- pmin(nrow(x), seq(5000, nrow(x) + 5000 - 1, 5000))
+    bks <- vector("integer")
+    for (slice_end in slices) {
+        bks <- fast_multipcf_(x_[1:slice_end, ],
+                              c(bks, mark[mark >= slice_end - 5000 &
+                                              mark < slice_end]),
+                              kmin,
+                              adjusted_gamma)
+    }
+    
+    starts <- bks + 1
+    ends <- c(starts[starts > 1] - 1, nrow(x))
+    lengths <- ends - starts + 1
+    means <- t(sapply(seq_along(starts), function(i) {
+        colMeans(x[starts[i]:ends[i], ])
+    }))
     list(starts = starts, ends = ends, lengths = lengths, means = means)
 }
