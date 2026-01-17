@@ -15,49 +15,51 @@ struct MultiAggregates {
     std::vector<int> pos_diff;
 };
 
-/* 
+/*
  * Checks that the index list 'r' is valid for the data 'y'.
  * Returns an index list that is in bounds, and fully spans the data.
  */
 void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
-    auto min_r = std::min_element(r.begin(), r.end());
-    auto max_r = std::max_element(r.begin(), r.end());
-    
-    if (*min_r < 0) {
-        throw std::runtime_error("Negative indices are not allowed");
+    if (r.empty()) {
+        r.push_back(0);
+        r.push_back(y.size());
+        return;
     }
-    
-    if (*max_r > y.size()) {
-        throw std::runtime_error("Max index in r is out of bounds of y");
+
+    size_t min_r = *std::min_element(r.begin(), r.end());
+    size_t max_r = *std::max_element(r.begin(), r.end());
+
+    if (min_r < 0) {
+        Rcpp::stop("Negative indices are not allowed");
     }
-    
-    if (*min_r > 0) {
+
+    if (max_r > y.size()) {
+        Rcpp::stop("Max index in r is out of bounds of y");
+    }
+
+    if (min_r > 0) {
         r.push_back(0);
     }
-    
-    if (*max_r < y.size() - 1) {
-        r.push_back(y.size() - 1);
-    }
-    
-    if (*max_r < y.size()) {
+
+    if (max_r < y.size()) {
         r.push_back(y.size());
     }
-    
-    if (!std::is_sorted(r.begin(), r.end())) {
-        std::sort(r.begin(), r.end());
-    }
+
+    std::sort(r.begin(), r.end());
+    auto last = std::unique(r.begin(), r.end());
+    r.erase(last, r.end());
 }
 
 Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> &r) {
-    
+
     sanitise_indices(y, r);
-    
+
     std::vector<double> agg;
     agg.reserve(r.size() - 1);
-    
+
     std::vector<int> pos_diff;
     pos_diff.reserve(r.size() - 1);
-    
+
     for (auto it = r.begin(), it2 = std::next(it);
          it != r.end() && it2 != r.end();
          ++it, ++it2) {
@@ -70,21 +72,21 @@ Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> &r) {
         agg.push_back(a);
         pos_diff.push_back(end - start);
     }
-    
+
     return Aggregates{agg, r, pos_diff};
 }
 
 MultiAggregates make_multi_aggregates(const NumericMatrix &y, std::vector<int> &r) {
-    
+
     NumericVector y0 = y(_, 0);
     sanitise_indices(Rcpp::as<std::vector<double>>(y0), r);
-    
+
     int samples = y.ncol();
     NumericMatrix agg(r.size() - 1, samples);
-    
+
     std::vector<int> pos_diff;
     pos_diff.reserve(r.size() - 1);
-    
+
     int j = 0; // row index in agg, for insertion
     for (auto it = r.begin(), it2 = std::next(it);
          it != r.end() && it2 != r.end();
@@ -98,7 +100,7 @@ MultiAggregates make_multi_aggregates(const NumericMatrix &y, std::vector<int> &
         agg(j++, _) = a;
         pos_diff.push_back(end - start);
     }
-    
+
     return MultiAggregates{agg, r, pos_diff};
 }
 
@@ -112,7 +114,7 @@ std::vector<int> exact_multipcf_(const NumericMatrix &y, unsigned int kmin, doub
     std::vector<double> S(N, 0); // Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
-    
+
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
             A(j, _) = A(j, _) + y(k, _);
@@ -123,14 +125,14 @@ std::vector<int> exact_multipcf_(const NumericMatrix &y, unsigned int kmin, doub
                 S[j] = D + E[j] + gamma;
             }
         }
-        
+
         auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
         auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
         auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
-    
+
     // Find start positions
     std::vector<int> starts;
     int pos = T.back();
@@ -157,12 +159,12 @@ void print_matrix(const NumericMatrix &m) {
 
 // [[Rcpp::export]]
 std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<int> &available_breakpoints, int kmin, double gamma) {
-    
+
     int samples = y.ncol();
     MultiAggregates agg = make_multi_aggregates(y, available_breakpoints);
     const NumericMatrix &u = agg.aggregates;
     const std::vector<int> &r = agg.pos;
-    
+
     std::size_t N = u.nrow();
     NumericMatrix A(N, samples);
     std::vector<int> C(N, 0);
@@ -170,7 +172,7 @@ std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<int> &availa
     std::vector<double> S(N, 0); // Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
-    
+
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
             A(j, _) = A(j, _) + u(k, _);
@@ -182,14 +184,14 @@ std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<int> &availa
                 S[j] = D + E[j] + gamma;
             }
         }
-        
+
         auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
         auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
         auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
-    
+
     // Find start positions
     std::vector<int> starts;
     int pos = T.back();
@@ -206,12 +208,17 @@ std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<int> &availa
 // [[Rcpp::export]]
 std::vector<int> exact_pcf_(const std::vector<double> &y, unsigned int kmin, double gamma) {
     std::size_t N = y.size();
+
+    if (N == 0) {
+        return {};
+    }
+
     std::vector<double> A(N, 0);
     double D = 0;
     std::vector<double> S(N, 0);// Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
-    
+
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
             A[j] += y[k];
@@ -222,14 +229,14 @@ std::vector<int> exact_pcf_(const std::vector<double> &y, unsigned int kmin, dou
                 S[j] = D + E[j] + gamma;
             }
         }
-        
+
         auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
         auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
         auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
-    
+
     // Find start positions
     std::vector<int> starts;
     int pos = T.back();
@@ -244,6 +251,10 @@ std::vector<int> exact_pcf_(const std::vector<double> &y, unsigned int kmin, dou
 
 template<typename T>
 void print_vec(std::string label, const std::vector<T> &v) {
+    if (v.empty()) {
+        std::cout << label << " []" << std::endl;
+        return;
+    }
     std::cout << label << " [";
     for (size_t i = 0; i < v.size() - 1; ++i) {
         std::cout << v[i] << ", ";
@@ -256,7 +267,7 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<int> &avail
     Aggregates agg = make_aggregates(y, available_breakpoints);
     const std::vector<double> &u = agg.aggregates;
     const std::vector<int> &r = agg.pos;
-    
+
     std::size_t N = u.size();
     std::vector<double> A(N, 0);
     std::vector<int> C(N, 0);
@@ -264,7 +275,7 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<int> &avail
     std::vector<double> S(N, 0); // Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
-    
+
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
             A[j] += u[k];
@@ -276,14 +287,14 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<int> &avail
                 S[j] = D + E[j] + gamma;
             }
         }
-        
+
         auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
         auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
         auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
-    
+
     // Find start positions
     std::vector<int> starts;
     int pos = T.back();
@@ -300,17 +311,24 @@ std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<int> &avail
 std::vector<double> convolve_(const std::vector<double>& x, const std::vector<double>& k) {
     int nx = x.size();
     int nk = k.size();
+    if (nx == 0 || nk == 0) {
+        return x;
+    }
     std::vector<double> out(nx + nk - 1, 0);
     for (int i = 0; i < nx; ++i) {
         for (int j = 0; j < nk; ++j) {
             out[i+j] += x[i] * k[j];
         }
     }
-    return std::vector<double>(out.begin() + nk / 2 - 1, out.end() - nk / 2);
+    size_t offset = nk & 1 ? (nk - 1) / 2 : nk / 2;
+    return std::vector<double>(out.begin() + offset, out.begin() + offset + nx);
 }
 
 // [[Rcpp::export]]
 double median_(NumericVector x) {
+    if (x.size() == 0) {
+        return NA_REAL;
+    }
     NumericVector y = clone(x);
     int n, half;
     double y1, y2;
@@ -352,14 +370,14 @@ std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, int filt
     for (int i = 0; i < filter_size; ++i) {
         k.push_back(1);
     }
-    
+
     NumericVector hpf = Rcpp::wrap(convolve_(x, k));
     NumericVector abshpf = abs(hpf);
     double threshold = median_(abshpf) + nmad * mad_(hpf);
     std::vector<int> out;
-    for (int i = 0; i < abshpf.size(); ++i) {
+    for (size_t i = 0; i < abshpf.size(); ++i) {
         if (abshpf[i] > threshold) {
-            out.push_back(i);
+            out.push_back(static_cast<int>(i));
         }
     }
     return out;
