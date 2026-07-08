@@ -5,24 +5,26 @@ using namespace Rcpp;
 // [[Rcpp::plugins(cpp11)]]
 struct Aggregates {
     std::vector<double> aggregates;
-    std::vector<int> pos;
-    std::vector<int> pos_diff;
+    std::vector<std::size_t> pos;
+    std::vector<std::size_t> pos_diff;
 };
 
 struct MultiAggregates {
-    NumericMatrix aggregates;
-    std::vector<int> pos;
-    std::vector<int> pos_diff;
+    std::vector<double> aggregates;
+    std::size_t samples;
+    std::vector<std::size_t> pos;
+    std::vector<std::size_t> pos_diff;
 };
 
 /*
- * Checks that the index list 'r' is valid for the data 'y'.
- * Returns an index list that is in bounds, and fully spans the data.
+ * Checks that the index list 'r' is valid for data of size n
+ * Updates r in-place to produce an index list that is in bounds,
+ * and fully spans the data.
  */
-void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
+void sanitise_indices(std::size_t n, std::vector<std::size_t> &r) {
     if (r.empty()) {
         r.push_back(0);
-        r.push_back(y.size());
+        r.push_back(n);
         return;
     }
 
@@ -33,7 +35,7 @@ void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
         Rcpp::stop("Negative indices are not allowed");
     }
 
-    if (static_cast<size_t>(max_r) > y.size()) {
+    if (static_cast<size_t>(max_r) > n) {
         Rcpp::stop("Max index in r is out of bounds of y");
     }
 
@@ -41,8 +43,8 @@ void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
         r.push_back(0);
     }
 
-    if (static_cast<size_t>(max_r) < y.size()) {
-        r.push_back(y.size());
+    if (static_cast<size_t>(max_r) < n) {
+        r.push_back(n);
     }
 
     std::sort(r.begin(), r.end());
@@ -50,14 +52,14 @@ void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
     r.erase(last, r.end());
 }
 
-Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> &r) {
+Aggregates make_aggregates(const std::vector<double> &y, std::vector<std::size_t> &r) {
 
-    sanitise_indices(y, r);
+    sanitise_indices(y.size(), r);
 
     std::vector<double> agg;
     agg.reserve(r.size() - 1);
 
-    std::vector<int> pos_diff;
+    std::vector<std::size_t> pos_diff;
     pos_diff.reserve(r.size() - 1);
 
     for (auto it = r.begin(), it2 = std::next(it);
@@ -76,32 +78,38 @@ Aggregates make_aggregates(const std::vector<double> &y, std::vector<int> &r) {
     return Aggregates{agg, r, pos_diff};
 }
 
-MultiAggregates make_multi_aggregates(const NumericMatrix &y, std::vector<int> &r) {
+/*
+ * Aggregates the data in y over segments defined by breakpoint vector r
+ */
+MultiAggregates make_multi_aggregates(const NumericMatrix &y, std::vector<std::size_t> &r) {
+    const std::size_t nrow = y.nrow();
+    const std::size_t samples = y.ncol();
 
-    NumericVector y0 = y(_, 0);
-    sanitise_indices(Rcpp::as<std::vector<double>>(y0), r);
+    // Make sure r fully spans the data and is in bounds
+    sanitise_indices(nrow, r);
 
-    int samples = y.ncol();
-    NumericMatrix agg(r.size() - 1, samples);
+    const std::size_t n_segs = r.size() - 1;
+    std::vector<double> agg(n_segs * samples, 0.0); // row-major storage for the aggregated matrix
+    std::vector<std::size_t> pos_diff;
+    pos_diff.reserve(n_segs);
 
-    std::vector<int> pos_diff;
-    pos_diff.reserve(r.size() - 1);
-
-    int j = 0; // row index in agg, for insertion
-    for (auto it = r.begin(), it2 = std::next(it);
-         it != r.end() && it2 != r.end();
-         ++it, ++it2) {
-        NumericVector a(samples);
-        int start = *it;
-        int end = *it2;
-        for (int i = start; i < end; ++i) {
-            a += y(i, _);
+    // Iterate over columns
+    for (std::size_t j = 0; j < samples; ++j) {
+        for (std::size_t seg = 0; seg < n_segs; ++seg) {
+            double segsum = 0.0;
+            for (std::size_t i = r[seg]; i < r[seg + 1]; ++i) {
+                segsum += y(i, j);
+            }
+            agg[seg * samples + j] = segsum;
         }
-        agg(j++, _) = a;
-        pos_diff.push_back(end - start);
     }
 
-    return MultiAggregates{agg, r, pos_diff};
+    for (std::size_t seg = 0; seg < n_segs; ++seg) {
+        assert (r[seg + 1] >= r[seg]);
+        pos_diff.push_back(r[seg + 1] - r[seg]);
+    }
+
+    return MultiAggregates{agg, samples, r, pos_diff};
 }
 
 
@@ -176,36 +184,45 @@ void print_matrix(const NumericMatrix &m) {
 }
 
 // [[Rcpp::export]]
-std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<int> &available_breakpoints, int kmin, double gamma) {
+std::vector<int> fast_multipcf_(const NumericMatrix &y, std::vector<std::size_t> &available_breakpoints, int kmin, double gamma) {
 
-    int samples = y.ncol();
     MultiAggregates agg = make_multi_aggregates(y, available_breakpoints);
-    const NumericMatrix &u = agg.aggregates;
-    const std::vector<int> &r = agg.pos;
+    const std::vector<double> &u = agg.aggregates;
+    const std::vector<std::size_t> &r = agg.pos;
+    const std::size_t samples = agg.samples;
+    const std::size_t N = r.size() - 1;
 
-    std::size_t N = u.nrow();
-    NumericMatrix A(N, samples);
-    std::vector<int> C(N, 0);
-    double D;
-    std::vector<double> S(N, 0); // Score
+    std::vector<double> A(N * samples, 0.0);
+    std::vector<std::size_t> C(N, 0);
+    std::vector<double> S(N, 0.0); // Score
     std::vector<double> E(N + 1, 0);
-    std::vector<int> T(N, -1);
+    std::vector<std::size_t> T(N, -1);
 
     for (int k = 0; k < N; ++k) {
         for (int j = 0; j <= k; ++j) {
-            A(j, _) = A(j, _) + u(k, _);
             C[j] += agg.pos_diff[k];
+
             if (r[j] > 0 && (r[j] < kmin || r[k + 1] - r[j] < kmin)) {
+                // Do the sum
+                for (std::size_t s = 0; s < samples; ++s) {
+                    A[j * samples + s] += u[k * samples + s];
+                }
                 S[j] = std::numeric_limits<double>::infinity();
             } else {
-                D = sum(-1 * A(j, _) * A(j, _) / C[j]);
-                S[j] = D + E[j] + gamma;
+                const double inv = -1.0 / C[j];
+                double D = 0.0;
+                for (int s = 0; s < samples; ++s) {
+                    A[j * samples + s] += u[k * samples + s];
+                    D += A[j * samples + s] * A[j * samples + s];
+                }
+
+                S[j] = inv * D + E[j] + gamma;
             }
         }
 
-        auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
-        auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
-        auto min_value = *min_element;
+        const auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
+        const auto min_position = std::distance(S.begin(), min_element);
+        const auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
@@ -281,10 +298,10 @@ void print_vec(std::string label, const std::vector<T> &v) {
 }
 
 // [[Rcpp::export]]
-std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<int> &available_breakpoints, int kmin, double gamma) {
+std::vector<int> fast_pcf_(const std::vector<double> &y, std::vector<std::size_t> &available_breakpoints, int kmin, double gamma) {
     Aggregates agg = make_aggregates(y, available_breakpoints);
     const std::vector<double> &u = agg.aggregates;
-    const std::vector<int> &r = agg.pos;
+    const std::vector<std::size_t> &r = agg.pos;
 
     std::size_t N = u.size();
     std::vector<double> A(N, 0);
