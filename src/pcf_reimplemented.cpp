@@ -106,29 +106,47 @@ MultiAggregates make_multi_aggregates(const NumericMatrix &y, std::vector<int> &
 
 
 // [[Rcpp::export]]
-std::vector<int> exact_multipcf_(const NumericMatrix &y, unsigned int kmin, double gamma) {
-    std::size_t N = y.nrow();
-    std::size_t samples = y.ncol();
-    NumericMatrix A(N, samples);
-    double D = 0;
-    std::vector<double> S(N, 0); // Score
+std::vector<int> exact_multipcf_(const NumericMatrix &y, std::size_t kmin, double gamma) {
+    std::cout << "This is the new version" << std::endl;
+    const std::size_t N = y.nrow();
+    const std::size_t samples = y.ncol();
+
+    // Transpose y into row-major format
+    std::vector<double> Y(N * samples);
+    for (std::size_t i = 0; i < N; ++i) {
+        for (std::size_t j = 0; j < samples; ++j) {
+            Y[i * samples + j] = y(i, j);
+        }
+    }
+
+    // Matrix A is an accumulator for the sums of the rows of y, used to compute the score function.
+    std::vector<double> A(N * samples, 0.0);
+    std::vector<double> S(N, 0.0); // Score
     std::vector<double> E(N + 1, 0);
     std::vector<int> T(N, -1);
 
-    for (int k = 0; k < N; ++k) {
-        for (int j = 0; j <= k; ++j) {
-            A(j, _) = A(j, _) + y(k, _);
+    for (std::size_t k = 0; k < N; ++k) {
+        for (std::size_t j = 0; j <= k; ++j) {
             if (j > 0 && (j < kmin || k + 1 - j < kmin)) {
+                // Do the sum in a manual loop instead of relying on Rcpp temporaries
+                for (std::size_t s = 0; s < samples; ++s) {
+                    A[j * samples + s] += Y[k * samples + s];
+                }
                 S[j] = std::numeric_limits<double>::infinity();
             } else {
-                D = sum(-1 * A(j, _) * A(j, _) / (k - j + 1));
-                S[j] = D + E[j] + gamma;
+                const double inv = -1.0 / (k - j + 1);
+                double D = 0.0;
+                for (std::size_t s = 0; s < samples; ++s) {
+                    A[j * samples + s] += Y[k * samples + s];
+                    D += A[j * samples + s] * A[j * samples + s];
+                }
+                S[j] = inv * D + E[j] + gamma;
             }
         }
 
-        auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
-        auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
-        auto min_value = *min_element;
+        const auto min_element = std::min_element(S.begin(), S.begin() + k + 1);
+        const auto min_position = static_cast<int>(std::distance(S.begin(), min_element));
+        const auto min_value = *min_element;
         E[k + 1] = min_value;
         T[k] = min_position;
     }
