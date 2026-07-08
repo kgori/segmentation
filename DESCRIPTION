@@ -7,6 +7,7 @@ Author: Kevin Gori
 Maintainer: Kevin Gori <kcg25@cam.ac.uk>
 Description: "segmentation" reimplements the PCF and MultiPCF algorithms from the package "copynumber", but uses C++ to increase speed and decrease memory requirements.
 License: MIT
+Encoding: UTF-8
 Imports: Rcpp (>= 1.0.5)
 LinkingTo: Rcpp
-RoxygenNote: 7.1.1
+Config/roxygen2/version: 8.0.0
