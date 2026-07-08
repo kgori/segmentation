@@ -26,14 +26,14 @@ void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
         return;
     }
 
-    size_t min_r = *std::min_element(r.begin(), r.end());
-    size_t max_r = *std::max_element(r.begin(), r.end());
+    int min_r = *std::min_element(r.begin(), r.end());
+    int max_r = *std::max_element(r.begin(), r.end());
 
     if (min_r < 0) {
         Rcpp::stop("Negative indices are not allowed");
     }
 
-    if (max_r > y.size()) {
+    if (static_cast<size_t>(max_r) > y.size()) {
         Rcpp::stop("Max index in r is out of bounds of y");
     }
 
@@ -41,7 +41,7 @@ void sanitise_indices(const std::vector<double> &y, std::vector<int> &r) {
         r.push_back(0);
     }
 
-    if (max_r < y.size()) {
+    if (static_cast<size_t>(max_r) < y.size()) {
         r.push_back(y.size());
     }
 
@@ -320,8 +320,7 @@ std::vector<double> convolve_(const std::vector<double>& x, const std::vector<do
             out[i+j] += x[i] * k[j];
         }
     }
-    size_t offset = nk & 1 ? (nk - 1) / 2 : nk / 2;
-    return std::vector<double>(out.begin() + offset, out.begin() + offset + nx);
+    return out;
 }
 
 // [[Rcpp::export]]
@@ -356,6 +355,10 @@ double mad_(NumericVector x, double scale_factor = 1.4826) {
 
 // [[Rcpp::export]]
 std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, int filter_size = 4) {
+    if (filter_size < 1) {
+        Rcpp::stop("filter_size must be at least 1");
+    }
+
     // Make the smoothing sawtooth filter for edge detection
     std::vector<double> k;
     for (int i = 0; i < filter_size; ++i) {
@@ -371,7 +374,11 @@ std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, int filt
         k.push_back(1);
     }
 
-    NumericVector hpf = Rcpp::wrap(convolve_(x, k));
+    std::vector<double> convolved = convolve_(x, k);
+
+    // The edge detection signal is strongest at the sign-change point of the filter; this offset aligns the convolved output with this signal.
+    auto offset = filter_size * 3 - 1;
+    NumericVector hpf = Rcpp::wrap(std::vector<double>(convolved.begin() + offset, convolved.begin() + offset + x.size()));
     NumericVector abshpf = abs(hpf);
     double threshold = median_(abshpf) + nmad * mad_(hpf);
     std::vector<int> out;
