@@ -190,26 +190,26 @@ BEGIN_RCPP
 END_RCPP
 }
 // exact_multipcf_
-std::vector<int> exact_multipcf_(const NumericMatrix& y, unsigned int kmin, double gamma);
+std::vector<int> exact_multipcf_(const NumericMatrix& y, int kmin, double gamma);
 RcppExport SEXP _segmentation_exact_multipcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericMatrix& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< unsigned int >::type kmin(kminSEXP);
+    Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     rcpp_result_gen = Rcpp::wrap(exact_multipcf_(y, kmin, gamma));
     return rcpp_result_gen;
 END_RCPP
 }
 // fast_multipcf_
-std::vector<int> fast_multipcf_(const NumericMatrix& y, std::vector<int>& available_breakpoints, int kmin, double gamma);
+std::vector<int> fast_multipcf_(const NumericMatrix& y, const std::vector<int>& available_breakpoints, int kmin, double gamma);
 RcppExport SEXP _segmentation_fast_multipcf_(SEXP ySEXP, SEXP available_breakpointsSEXP, SEXP kminSEXP, SEXP gammaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const NumericMatrix& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< std::vector<int>& >::type available_breakpoints(available_breakpointsSEXP);
+    Rcpp::traits::input_parameter< const std::vector<int>& >::type available_breakpoints(available_breakpointsSEXP);
     Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     rcpp_result_gen = Rcpp::wrap(fast_multipcf_(y, available_breakpoints, kmin, gamma));
@@ -217,26 +217,26 @@ BEGIN_RCPP
 END_RCPP
 }
 // exact_pcf_
-std::vector<int> exact_pcf_(const std::vector<double>& y, unsigned int kmin, double gamma);
+std::vector<int> exact_pcf_(const std::vector<double>& y, int kmin, double gamma);
 RcppExport SEXP _segmentation_exact_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const std::vector<double>& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< unsigned int >::type kmin(kminSEXP);
+    Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     rcpp_result_gen = Rcpp::wrap(exact_pcf_(y, kmin, gamma));
     return rcpp_result_gen;
 END_RCPP
 }
 // fast_pcf_
-std::vector<int> fast_pcf_(const std::vector<double>& y, std::vector<int>& available_breakpoints, int kmin, double gamma);
+std::vector<int> fast_pcf_(const std::vector<double>& y, const std::vector<int>& available_breakpoints, int kmin, double gamma);
 RcppExport SEXP _segmentation_fast_pcf_(SEXP ySEXP, SEXP available_breakpointsSEXP, SEXP kminSEXP, SEXP gammaSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const std::vector<double>& >::type y(ySEXP);
-    Rcpp::traits::input_parameter< std::vector<int>& >::type available_breakpoints(available_breakpointsSEXP);
+    Rcpp::traits::input_parameter< const std::vector<int>& >::type available_breakpoints(available_breakpointsSEXP);
     Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     rcpp_result_gen = Rcpp::wrap(fast_pcf_(y, available_breakpoints, kmin, gamma));
