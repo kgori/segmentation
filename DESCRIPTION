@@ -10,4 +10,5 @@ License: MIT
 Encoding: UTF-8
 Imports: Rcpp (>= 1.0.5)
 LinkingTo: Rcpp
+SystemRequirements: C++17
 Config/roxygen2/version: 8.0.0

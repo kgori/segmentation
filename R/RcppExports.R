@@ -77,11 +77,19 @@ median_ <- function(x) {
     .Call(`_segmentation_median_`, x)
 }
 
-mad_ <- function(x, scale_factor = 1.4826) {
-    .Call(`_segmentation_mad_`, x, scale_factor)
+make_cost_vector_ <- function(data, kernel_size) {
+    .Call(`_segmentation_make_cost_vector_`, data, kernel_size)
 }
 
-mark_ <- function(x, nmad = 1.0, filter_size = 4L) {
-    .Call(`_segmentation_mark_`, x, nmad, filter_size)
+mark_ <- function(x, frac = 0.12, kernel_size = 8L, thres = 0.9) {
+    .Call(`_segmentation_mark_`, x, frac, kernel_size, thres)
+}
+
+mark_multi_ <- function(x, frac = 0.12, kernel_size = 8L, thres = 0.9) {
+    .Call(`_segmentation_mark_multi_`, x, frac, kernel_size, thres)
+}
+
+mad_ <- function(x, scale_factor = 1.4826) {
+    .Call(`_segmentation_mad_`, x, scale_factor)
 }
 

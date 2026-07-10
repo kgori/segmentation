@@ -1,8 +1,6 @@
 #include <Rcpp.h>
 using namespace Rcpp;
 
-// Enable C++11 via this plugin (Rcpp 0.10.3 or later)
-// [[Rcpp::plugins(cpp11)]]
 struct Aggregates {
     std::vector<double> aggregates;
     std::vector<std::size_t> pos;
@@ -391,43 +389,214 @@ double median_(NumericVector x) {
     }
 }
 
+
+/*
+ * Scanner for likely-looking breakpoints
+ */
+
+std::vector<double> make_prefix_sums(const std::vector<double>& x) {
+    const std::size_t N = x.size();
+    std::vector<double> cumulative_sum(N + 1, 0.0);
+    for (std::size_t i = 0; i < N; ++i) {
+        cumulative_sum[i + 1] = cumulative_sum[i] + x[i];
+    }
+    return cumulative_sum;
+}
+
+// Takes v by value deliberately (nth_element modifies in place).
+double quantile_p(std::vector<double> v, double p) {
+    if (v.empty()) {
+        return 0.0;
+    }
+    std::size_t idx = static_cast<std::size_t>(p * static_cast<double>(v.size() - 1));
+    if (idx >= v.size()) {
+        idx = v.size() - 1;
+    }
+    std::nth_element(v.begin(), v.begin() + idx, v.end());
+    return v[idx];
+};
+
+std::vector<double> sliding_max_7(const std::vector<double>& v) {
+    const std::size_t n = v.size();
+    std::vector<double> out(n, 0.0);
+    for (std::size_t i = 0; i < n; ++i) {
+        const std::size_t lo = (i >= 3) ? i - 3 : 0;
+        const std::size_t hi = std::min(n, i + 4);
+        double mx = 0.0;
+        for (std::size_t w = lo; w < hi; ++w)
+            if (v[w] > mx) {
+                mx = v[w];
+            }
+        out[i] = mx;
+    }
+    return out;
+};
+
+// [[Rcpp::export]]
+std::vector<double> make_cost_vector_(const std::vector<double>& data, std::size_t kernel_size) {
+    std::size_t N = data.size();
+    std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
+    if (kernel_size < 1) {
+        Rcpp::stop("kernel_size must be >= 1");
+    }
+    if (N < size_check) {
+        Rcpp::stop("Input too short for filter size (need >= 6*L = %d points)", 6 * kernel_size);
+    }
+
+    // The cost function is faster to calculate if we collect prefix sums up front
+    std::vector<double> prefix_sums = make_prefix_sums(data);
+    
+    std::vector<double> cost(N, 0.0);
+    const std::size_t n_valid1 = N - size_check + 1;
+    for (std::size_t i = 0; i < n_valid1; ++i) {
+        cost[i + 3 * kernel_size - 1] = std::abs(
+            4.0 * prefix_sums[i + 3 * kernel_size]
+            - prefix_sums[i]
+            - prefix_sums[i + kernel_size]
+            - prefix_sums[i + 5 * kernel_size]
+            - prefix_sums[i + 6 * kernel_size]);
+    }
+    return cost;
+}
+
+/*
+    * Marks likely breakpoints in a signal using a sawtooth kernel and local thresholding.
+    * 
+    * @param x The input signal as a vector of doubles.
+    * @param frac The fraction of the signal to mark (default 0.12).
+    * @param kernel_size The size of the sawtooth kernel (default 8). The kernel structure is [-1, -2, -2, +2, +2, +1]
+    * with each element repeated 'kernel_size' times, so the actual kernel length is 6 * kernel_size.
+    * @param thres The threshold for marking peaks relative to local maxima (default 0.9).
+    * @return A vector of *ZERO-BASED* indices in x that are marked as likely breakpoints.
+    */
+// [[Rcpp::export]]
+std::vector<int> mark_(const std::vector<double>& x,
+                        double frac = 0.12,
+                        int kernel_size = 8,
+                        double thres = 0.9) {
+    const std::size_t N = x.size();
+
+    // Extra careful size validation
+    const std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
+    if (kernel_size < 1) Rcpp::stop("kernel_size must be >= 1");
+    if (N < size_check) Rcpp::stop("Input too short for filter size (need >= 6*kernel_size = %d points)", 6 * kernel_size);
+    
+    // Convolution of data with a sawtooth kernel structured as [-1l, -2l, -2l, 2l, 2l, 1l],
+    // where l is kernel size, and '-1l' means repeat -1 l times.
+    std::vector<double> cost = make_cost_vector(x, kernel_size);
+
+    // Make a local upper threshold vector using sliding window local max
+    const auto local_max = sliding_max_7(cost);
+
+    // Select elements of the cost vector when they are within 'thres' of the local max
+    std::vector<double> peaks;
+    for (std::size_t i = 0; i < N; ++i) {
+        if (cost[i] > 0.0 && cost[i] >= thres * local_max[i]) {
+            peaks.push_back(cost[i]);
+        }
+    }
+
+    // If in the unexpected case no peaks are found, return an empty vector
+    if (peaks.empty()) {
+        return {};
+    }
+    
+    // Find the quantile of the selected peaks that will result in marking approximately 'frac' of the total signal
+    const double adjusted_frac = std::min(1 - frac, frac * static_cast<double>(N) / static_cast<double>(peaks.size()));
+    const double limit = quantile_p(peaks, 1.0 - adjusted_frac);
+
+    // Mark indices where the cost exceeds both the limit and the thresholded local max
+    std::vector<int> marked_indices;
+    for (std::size_t i = 0; i < N; ++i) {
+        if (cost[i] > limit && cost[i] > thres * local_max[i]) {
+            marked_indices.push_back(static_cast<int>(i));
+        }
+    }
+    return marked_indices;
+}
+
+/*
+    * Marks likely breakpoints jointly in multiple samples using a sawtooth kernel and local thresholding.
+    * 
+    * @param x The input signal as a matrix of doubles, samples in columns.
+    * @param frac The fraction of the signal to mark (default 0.12).
+    * @param kernel_size The size of the sawtooth kernel (default 8). The kernel structure is [-1, -2, -2, +2, +2, +1]
+    * with each element repeated 'kernel_size' times, so the actual kernel length is 6 * kernel_size.
+    * @param thres The threshold for marking peaks relative to local maxima (default 0.9).
+    * @return A vector of *ZERO-BASED* indices in x that are marked as likely breakpoints.
+    */
+// [[Rcpp::export]]
+std::vector<int> mark_multi_(const NumericMatrix& x,
+                        double frac = 0.12,
+                        int kernel_size = 8,
+                        double thres = 0.9) {
+    const std::size_t N = x.nrow();
+    const std::size_t S = x.ncol();
+    if (N == 0 || S == 0) {
+        return {};
+    }
+
+    // Extra careful size validation
+    const std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
+    if (kernel_size < 1) Rcpp::stop("kernel_size must be >= 1");
+    if (N < size_check) Rcpp::stop("Input too short for filter size (need >= 6*kernel_size = %d points)", 6 * kernel_size);
+    
+    // Convolution of each sample with a sawtooth kernel structured as [-1l, -2l, -2l, 2l, 2l, 1l],
+    // where l is kernel size, and '-1l' means repeat -1 l times. Take the max across all samples.
+    std::vector<double> cost_joint(N, 0.0);
+    std::vector<double> samplebuf(N, 0.0);
+    for (std::size_t s = 0; s < S; ++s) {
+        const auto sample = x.column(s);
+        samplebuf.assign(sample.begin(), sample.end());
+        std::vector<double> cost_sample = make_cost_vector(samplebuf, kernel_size);
+        for (std::size_t i = 0; i < N; ++i) {
+            if (cost_joint[i] < cost_sample[i]) {
+                cost_joint[i] = cost_sample[i];
+            }
+        }
+    }
+
+    // Make a local upper threshold vector using sliding window local max
+    const auto local_max = sliding_max_7(cost_joint);
+
+    // Select elements of the cost vector when they are within 'thres' of the local max
+    std::vector<double> peaks;
+    for (std::size_t i = 0; i < N; ++i) {
+        if (cost_joint[i] > 0.0 && cost_joint[i] >= thres * local_max[i]) {
+            peaks.push_back(cost_joint[i]);
+        }
+    }
+
+    // If in the unexpected case no peaks are found, return an empty vector
+    if (peaks.empty()) {
+        return {};
+    }
+    
+    // Find the quantile of the selected peaks that will result in marking approximately 'frac' of the total signal
+    const double adjusted_frac = std::min(1 - frac, frac * static_cast<double>(N) / static_cast<double>(peaks.size()));
+    const double limit = quantile_p(peaks, 1.0 - adjusted_frac);
+
+    // Mark indices where the cost exceeds both the limit and the thresholded local max
+    std::vector<int> marked_indices;
+    for (std::size_t i = 0; i < N; ++i) {
+        if (cost_joint[i] > limit && cost_joint[i] > thres * local_max[i]) {
+            marked_indices.push_back(static_cast<int>(i));
+        }
+    }
+    return marked_indices;
+}
+
+/*
+ * The median absolute deviation (MAD) of a numeric vector.
+ *
+ * @param x A numeric vector.
+ * @param scale_factor A scaling factor to adjust the MAD (default is 1.4826).
+ * @return The scaled MAD of the input vector.
+ */
 // [[Rcpp::export]]
 double mad_(NumericVector x, double scale_factor = 1.4826) {
     // scale_factor = 1.4826; default for normal distribution consistent with R
     return median_(abs(x - median_(x))) * scale_factor;
-}
-
-// [[Rcpp::export]]
-std::vector<int> mark_(const std::vector<double>& x, double nmad = 1.0, int filter_size = 4) {
-    if (filter_size < 1) {
-        Rcpp::stop("filter_size must be at least 1");
-    }
-    if (x.size() < static_cast<std::size_t>(filter_size * 6)) {
-        Rcpp::stop("Input vector x is too short for the specified filter_size");
-    }
-
-    // Make the smoothing sawtooth filter for edge detection
-    std::vector<double> k;
-    k.reserve(6 * filter_size);
-    k.insert(k.end(), filter_size, -1);
-    k.insert(k.end(), 2 * filter_size, -2);
-    k.insert(k.end(), 2 * filter_size, 2);
-    k.insert(k.end(), filter_size, 1);
-
-    std::vector<double> convolved = convolve_(x, k);
-
-    // The edge detection signal is strongest at the sign-change point of the filter; this offset aligns the convolved output with this signal.
-    auto offset = filter_size * 3 - 1;
-    NumericVector hpf = Rcpp::wrap(std::vector<double>(convolved.begin() + offset, convolved.begin() + offset + x.size()));
-    NumericVector abshpf = abs(hpf);
-    double threshold = median_(abshpf) + nmad * mad_(hpf);
-    std::vector<int> out;
-    for (std::size_t i = 0; i < abshpf.size(); ++i) {
-        if (abshpf[i] > threshold) {
-            out.push_back(static_cast<int>(i));
-        }
-    }
-    return out;
 }
 
 #ifdef DEBUG_BUILD

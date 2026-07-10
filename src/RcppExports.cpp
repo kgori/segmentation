@@ -266,6 +266,46 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// make_cost_vector_
+std::vector<double> make_cost_vector_(const std::vector<double>& data, std::size_t kernel_size);
+RcppExport SEXP _segmentation_make_cost_vector_(SEXP dataSEXP, SEXP kernel_sizeSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type data(dataSEXP);
+    Rcpp::traits::input_parameter< std::size_t >::type kernel_size(kernel_sizeSEXP);
+    rcpp_result_gen = Rcpp::wrap(make_cost_vector_(data, kernel_size));
+    return rcpp_result_gen;
+END_RCPP
+}
+// mark_
+std::vector<int> mark_(const std::vector<double>& x, double frac, int kernel_size, double thres);
+RcppExport SEXP _segmentation_mark_(SEXP xSEXP, SEXP fracSEXP, SEXP kernel_sizeSEXP, SEXP thresSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const std::vector<double>& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type frac(fracSEXP);
+    Rcpp::traits::input_parameter< int >::type kernel_size(kernel_sizeSEXP);
+    Rcpp::traits::input_parameter< double >::type thres(thresSEXP);
+    rcpp_result_gen = Rcpp::wrap(mark_(x, frac, kernel_size, thres));
+    return rcpp_result_gen;
+END_RCPP
+}
+// mark_multi_
+std::vector<int> mark_multi_(const NumericMatrix& x, double frac, int kernel_size, double thres);
+RcppExport SEXP _segmentation_mark_multi_(SEXP xSEXP, SEXP fracSEXP, SEXP kernel_sizeSEXP, SEXP thresSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const NumericMatrix& >::type x(xSEXP);
+    Rcpp::traits::input_parameter< double >::type frac(fracSEXP);
+    Rcpp::traits::input_parameter< int >::type kernel_size(kernel_sizeSEXP);
+    Rcpp::traits::input_parameter< double >::type thres(thresSEXP);
+    rcpp_result_gen = Rcpp::wrap(mark_multi_(x, frac, kernel_size, thres));
+    return rcpp_result_gen;
+END_RCPP
+}
 // mad_
 double mad_(NumericVector x, double scale_factor);
 RcppExport SEXP _segmentation_mad_(SEXP xSEXP, SEXP scale_factorSEXP) {
@@ -275,19 +315,6 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< NumericVector >::type x(xSEXP);
     Rcpp::traits::input_parameter< double >::type scale_factor(scale_factorSEXP);
     rcpp_result_gen = Rcpp::wrap(mad_(x, scale_factor));
-    return rcpp_result_gen;
-END_RCPP
-}
-// mark_
-std::vector<int> mark_(const std::vector<double>& x, double nmad, int filter_size);
-RcppExport SEXP _segmentation_mark_(SEXP xSEXP, SEXP nmadSEXP, SEXP filter_sizeSEXP) {
-BEGIN_RCPP
-    Rcpp::RObject rcpp_result_gen;
-    Rcpp::RNGScope rcpp_rngScope_gen;
-    Rcpp::traits::input_parameter< const std::vector<double>& >::type x(xSEXP);
-    Rcpp::traits::input_parameter< double >::type nmad(nmadSEXP);
-    Rcpp::traits::input_parameter< int >::type filter_size(filter_sizeSEXP);
-    rcpp_result_gen = Rcpp::wrap(mark_(x, nmad, filter_size));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -312,8 +339,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_segmentation_fast_pcf_", (DL_FUNC) &_segmentation_fast_pcf_, 4},
     {"_segmentation_convolve_", (DL_FUNC) &_segmentation_convolve_, 2},
     {"_segmentation_median_", (DL_FUNC) &_segmentation_median_, 1},
+    {"_segmentation_make_cost_vector_", (DL_FUNC) &_segmentation_make_cost_vector_, 2},
+    {"_segmentation_mark_", (DL_FUNC) &_segmentation_mark_, 4},
+    {"_segmentation_mark_multi_", (DL_FUNC) &_segmentation_mark_multi_, 4},
     {"_segmentation_mad_", (DL_FUNC) &_segmentation_mad_, 2},
-    {"_segmentation_mark_", (DL_FUNC) &_segmentation_mark_, 3},
     {NULL, NULL, 0}
 };
 
