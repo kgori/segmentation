@@ -77,8 +77,16 @@ median_ <- function(x) {
     .Call(`_segmentation_median_`, x)
 }
 
+sliding_max_7 <- function(v) {
+    .Call(`_segmentation_sliding_max_7`, v)
+}
+
 make_cost_vector_ <- function(data, kernel_size) {
     .Call(`_segmentation_make_cost_vector_`, data, kernel_size)
+}
+
+make_cost_vector_padded_ <- function(data, kernel_size) {
+    .Call(`_segmentation_make_cost_vector_padded_`, data, kernel_size)
 }
 
 mark_ <- function(x, frac = 0.12, kernel_size = 8L, thres = 0.9) {

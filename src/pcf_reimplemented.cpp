@@ -391,7 +391,9 @@ double median_(NumericVector x) {
 
 
 /*
- * Scanner for likely-looking breakpoints
+ * fast_* functions need a set of candidate breakpoints. The following mark_ and mark_multi_
+ * functions provide a method to generate a breakpoint set using a sawtooth kernel and local
+ * thresholding.
  */
 
 std::vector<double> make_prefix_sums(const std::vector<double>& x) {
@@ -416,6 +418,7 @@ double quantile_p(std::vector<double> v, double p) {
     return v[idx];
 };
 
+// [[Rcpp::export]]
 std::vector<double> sliding_max_7(const std::vector<double>& v) {
     const std::size_t n = v.size();
     std::vector<double> out(n, 0.0);
@@ -445,7 +448,7 @@ std::vector<double> make_cost_vector_(const std::vector<double>& data, std::size
 
     // The cost function is faster to calculate if we collect prefix sums up front
     std::vector<double> prefix_sums = make_prefix_sums(data);
-    
+
     std::vector<double> cost(N, 0.0);
     const std::size_t n_valid1 = N - size_check + 1;
     for (std::size_t i = 0; i < n_valid1; ++i) {
@@ -459,9 +462,52 @@ std::vector<double> make_cost_vector_(const std::vector<double>& data, std::size
     return cost;
 }
 
+// [[Rcpp::export]]
+std::vector<double> make_cost_vector_padded_(const std::vector<double>& data, std::size_t kernel_size) {
+    std::size_t N = data.size();
+    std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
+    if (kernel_size < 1) {
+        Rcpp::stop("kernel_size must be >= 1");
+    }
+    if (N < size_check) {
+        Rcpp::stop("Input too short for filter size (need >= 6*L = %d points)", 6 * kernel_size);
+    }
+
+    // The cost function is faster to calculate if we collect prefix sums up front
+    std::vector<double> prefix_sums = make_prefix_sums(data);
+
+    std::vector<double> cost(N, 0.0);
+
+    // lambda to get the prefix sum with zero padding for out-of-bounds indices
+    auto get_prefix_sum = [&](int idx) -> double {
+        if (idx < 0) {
+            return 0.0; // padding with zeros
+        } else if (static_cast<std::size_t>(idx) >= prefix_sums.size()) {
+            return prefix_sums.back(); // return the last valid prefix sum
+        } else {
+            return prefix_sums[idx];
+        }
+    };
+
+    // Simulate left and right padding - when the lookup index is out of bounds, it will return 0.0
+    for (std::size_t j = 0; j < N; ++j) {
+        // Transformation to index into the prefix sum array, accounting for the kernel size and padding
+        int i = static_cast<int>(j) - (3 * kernel_size - 1);
+        cost[j] = std::abs(
+            4.0 * get_prefix_sum(i + 3 * kernel_size)
+            - get_prefix_sum(i)
+            - get_prefix_sum(i + kernel_size)
+            - get_prefix_sum(i + 5 * kernel_size)
+            - get_prefix_sum(i + 6 * kernel_size));
+    }
+
+    return cost;
+}
+
+
 /*
     * Marks likely breakpoints in a signal using a sawtooth kernel and local thresholding.
-    * 
+    *
     * @param x The input signal as a vector of doubles.
     * @param frac The fraction of the signal to mark (default 0.12).
     * @param kernel_size The size of the sawtooth kernel (default 8). The kernel structure is [-1, -2, -2, +2, +2, +1]
@@ -480,10 +526,10 @@ std::vector<int> mark_(const std::vector<double>& x,
     const std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
     if (kernel_size < 1) Rcpp::stop("kernel_size must be >= 1");
     if (N < size_check) Rcpp::stop("Input too short for filter size (need >= 6*kernel_size = %d points)", 6 * kernel_size);
-    
+
     // Convolution of data with a sawtooth kernel structured as [-1l, -2l, -2l, 2l, 2l, 1l],
     // where l is kernel size, and '-1l' means repeat -1 l times.
-    std::vector<double> cost = make_cost_vector(x, kernel_size);
+    std::vector<double> cost = make_cost_vector_(x, kernel_size);
 
     // Make a local upper threshold vector using sliding window local max
     const auto local_max = sliding_max_7(cost);
@@ -500,7 +546,7 @@ std::vector<int> mark_(const std::vector<double>& x,
     if (peaks.empty()) {
         return {};
     }
-    
+
     // Find the quantile of the selected peaks that will result in marking approximately 'frac' of the total signal
     const double adjusted_frac = std::min(1 - frac, frac * static_cast<double>(N) / static_cast<double>(peaks.size()));
     const double limit = quantile_p(peaks, 1.0 - adjusted_frac);
@@ -517,7 +563,7 @@ std::vector<int> mark_(const std::vector<double>& x,
 
 /*
     * Marks likely breakpoints jointly in multiple samples using a sawtooth kernel and local thresholding.
-    * 
+    *
     * @param x The input signal as a matrix of doubles, samples in columns.
     * @param frac The fraction of the signal to mark (default 0.12).
     * @param kernel_size The size of the sawtooth kernel (default 8). The kernel structure is [-1, -2, -2, +2, +2, +1]
@@ -540,7 +586,7 @@ std::vector<int> mark_multi_(const NumericMatrix& x,
     const std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
     if (kernel_size < 1) Rcpp::stop("kernel_size must be >= 1");
     if (N < size_check) Rcpp::stop("Input too short for filter size (need >= 6*kernel_size = %d points)", 6 * kernel_size);
-    
+
     // Convolution of each sample with a sawtooth kernel structured as [-1l, -2l, -2l, 2l, 2l, 1l],
     // where l is kernel size, and '-1l' means repeat -1 l times. Take the max across all samples.
     std::vector<double> cost_joint(N, 0.0);
@@ -548,7 +594,7 @@ std::vector<int> mark_multi_(const NumericMatrix& x,
     for (std::size_t s = 0; s < S; ++s) {
         const auto sample = x.column(s);
         samplebuf.assign(sample.begin(), sample.end());
-        std::vector<double> cost_sample = make_cost_vector(samplebuf, kernel_size);
+        std::vector<double> cost_sample = make_cost_vector_(samplebuf, kernel_size);
         for (std::size_t i = 0; i < N; ++i) {
             if (cost_joint[i] < cost_sample[i]) {
                 cost_joint[i] = cost_sample[i];
@@ -571,7 +617,7 @@ std::vector<int> mark_multi_(const NumericMatrix& x,
     if (peaks.empty()) {
         return {};
     }
-    
+
     // Find the quantile of the selected peaks that will result in marking approximately 'frac' of the total signal
     const double adjusted_frac = std::min(1 - frac, frac * static_cast<double>(N) / static_cast<double>(peaks.size()));
     const double limit = quantile_p(peaks, 1.0 - adjusted_frac);
