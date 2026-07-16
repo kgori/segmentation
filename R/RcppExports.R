@@ -53,6 +53,10 @@ markWithPottsCpp <- function(kmin, gamma, nr, res, subsize) {
     .Call(`_segmentation_markWithPottsCpp`, kmin, gamma, nr, res, subsize)
 }
 
+pelt_multipcf_ <- function(y, kmin, gamma) {
+    .Call(`_segmentation_pelt_multipcf_`, y, kmin, gamma)
+}
+
 exact_multipcf_ <- function(y, kmin, gamma) {
     .Call(`_segmentation_exact_multipcf_`, y, kmin, gamma)
 }
@@ -63,6 +67,10 @@ fast_multipcf_ <- function(y, available_breakpoints, kmin, gamma) {
 
 exact_pcf_ <- function(y, kmin, gamma) {
     .Call(`_segmentation_exact_pcf_`, y, kmin, gamma)
+}
+
+pelt_pcf_ <- function(y, kmin, gamma) {
+    .Call(`_segmentation_pelt_pcf_`, y, kmin, gamma)
 }
 
 fast_pcf_ <- function(y, available_breakpoints, kmin, gamma) {
