@@ -635,35 +635,17 @@ std::vector<double> sliding_max_7(const std::vector<double>& v) {
     return out;
 };
 
+/*
+ * Makes a cost vector from the input data by convolution with a sawtooth edge detecting kernel.
+ * The convolution treats the input data as if it were padded with zeros on both ends.
+ * Sawtooth kernel structure is [-1, -2, -2, +2, +2, +1] with each element repeated 'kernel_size' times.
+ *
+ * @param data The input data vector (floating point numeric).
+ * @param kernel_size The repeat size of the sawtooth kernel (must be >= 1).
+ * @return A vector of the same length as `data` containing the cost values.
+ */
 // [[Rcpp::export]]
 std::vector<double> make_cost_vector_(const std::vector<double>& data, std::size_t kernel_size) {
-    std::size_t N = data.size();
-    std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
-    if (kernel_size < 1) {
-        Rcpp::stop("kernel_size must be >= 1");
-    }
-    if (N < size_check) {
-        Rcpp::stop("Input too short for filter size (need >= 6*L = %d points)", 6 * kernel_size);
-    }
-
-    // The cost function is faster to calculate if we collect prefix sums up front
-    std::vector<double> prefix_sums = make_prefix_sums(data);
-
-    std::vector<double> cost(N, 0.0);
-    const std::size_t n_valid1 = N - size_check + 1;
-    for (std::size_t i = 0; i < n_valid1; ++i) {
-        cost[i + 3 * kernel_size - 1] = std::abs(
-            4.0 * prefix_sums[i + 3 * kernel_size]
-            - prefix_sums[i]
-            - prefix_sums[i + kernel_size]
-            - prefix_sums[i + 5 * kernel_size]
-            - prefix_sums[i + 6 * kernel_size]);
-    }
-    return cost;
-}
-
-// [[Rcpp::export]]
-std::vector<double> make_cost_vector_padded_(const std::vector<double>& data, std::size_t kernel_size) {
     std::size_t N = data.size();
     std::size_t size_check = static_cast<std::size_t>(6 * kernel_size);
     if (kernel_size < 1) {
