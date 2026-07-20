@@ -11,3 +11,6 @@ but have been reimplemented here because:
   - Parts of the algorithm were not implemented in the BioConductor package, mainly
   the `kmin` parameter (controlling the minimum size of a segment) was not available
   in "multipcf", but is provided here.
+
+## Release v1.1
+This release adds PELT optimisation to exact PCF (Pruned Exact Linear Time). This version has the same worst-case quadratic time complexity as Exact PCF, but approaches linear time in the best case. It does this by discovering positions that can never improve the overall segmentation score, and removing them from future iterations.

@@ -412,7 +412,8 @@ std::vector<int> exact_pcf_(const std::vector<double> &y, int kmin, double gamma
 }
 
 // [[Rcpp::export]]
-std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma) {
+std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
+                           const std::vector<int>& allowed_breakpoints) {
     if (kmin < 1) {
         Rcpp::stop("kmin must be at least 1");
     }
@@ -424,12 +425,25 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma)
         return {};
     }
 
+    for (const auto& bp : allowed_breakpoints) {
+        if (bp < 0 || static_cast<std::size_t>(bp) >= y.size()) {
+            Rcpp::stop("Allowed breakpoints must be within the range of the data");
+        }
+    }
+
     // Difference from exact: A is now a prefix sum vector so we can compute the sum for any size segment in O(1) time.
     std::vector<double> A = make_prefix_sums(y);
     // Difference from exact: no need for score vector S
     // Difference from exact: E is now initialized to infinity so that we can prune the search space.
     std::vector<double> E(N + 1, std::numeric_limits<double>::infinity());
     std::vector<int> T(N, -1);
+
+    // Construct the allowed set of breakpoints
+    bool restrict_breakpoints = !allowed_breakpoints.empty();
+    std::set<std::size_t> allowed_set(allowed_breakpoints.begin(), allowed_breakpoints.end());
+    // Always allow the start and end of the data as a breakpoint
+    allowed_set.insert(0);
+    allowed_set.insert(N);
 
     // Initialise E[0] to 0
     E[0] = 0.0;
@@ -444,7 +458,15 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma)
 
         // Difference from exact: Iterate only over candidates, not all j
         for (const std::size_t j : R) {
-            if (j > 0 && end - j < kmin_size) {
+            if (restrict_breakpoints && !allowed_set.count(j)) {
+                continue; // Skip if j is not in the allowed breakpoints
+            }
+
+            if (j > end) {
+                Rcpp::stop("Candidate j is greater than end k+1, which should not happen");
+            }
+
+            if (end - j < kmin_size) {
                 continue; // Skip if the segment is too short
             }
 
@@ -468,6 +490,14 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma)
         R_new.reserve(R.size() + 1);
 
         for (const std::size_t j : R) {
+            if (restrict_breakpoints && !allowed_set.count(j)) {
+                continue; // Skip if j is not in the allowed breakpoints
+            }
+
+            if (j > end) {
+                Rcpp::stop("Candidate j is greater than end k+1, which should not happen");
+            }
+
             if (end - j < kmin_size) {
                 // Segment is too short, but we still need to keep it in R_new for future iterations
                 R_new.push_back(j);
@@ -486,7 +516,9 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma)
         }
 
         if (end >= kmin_size && end < N) {
-            R_new.push_back(end); // Add the current end as a new candidate
+            if (!restrict_breakpoints || allowed_set.count(end)) {
+                R_new.push_back(end); // Add the current end as a new candidate
+            }
         }
 
         R.swap(R_new); // Update R to the new candidate set

@@ -69,8 +69,8 @@ exact_pcf_ <- function(y, kmin, gamma) {
     .Call(`_segmentation_exact_pcf_`, y, kmin, gamma)
 }
 
-pelt_pcf_ <- function(y, kmin, gamma) {
-    .Call(`_segmentation_pelt_pcf_`, y, kmin, gamma)
+pelt_pcf_ <- function(y, kmin, gamma, allowed_breakpoints) {
+    .Call(`_segmentation_pelt_pcf_`, y, kmin, gamma, allowed_breakpoints)
 }
 
 fast_pcf_ <- function(y, available_breakpoints, kmin, gamma) {

@@ -243,15 +243,16 @@ BEGIN_RCPP
 END_RCPP
 }
 // pelt_pcf_
-std::vector<int> pelt_pcf_(const std::vector<double>& y, int kmin, double gamma);
-RcppExport SEXP _segmentation_pelt_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP) {
+std::vector<int> pelt_pcf_(const std::vector<double>& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints);
+RcppExport SEXP _segmentation_pelt_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
     Rcpp::traits::input_parameter< const std::vector<double>& >::type y(ySEXP);
     Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
-    rcpp_result_gen = Rcpp::wrap(pelt_pcf_(y, kmin, gamma));
+    Rcpp::traits::input_parameter< const std::vector<int>& >::type allowed_breakpoints(allowed_breakpointsSEXP);
+    rcpp_result_gen = Rcpp::wrap(pelt_pcf_(y, kmin, gamma, allowed_breakpoints));
     return rcpp_result_gen;
 END_RCPP
 }
@@ -374,7 +375,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_segmentation_exact_multipcf_", (DL_FUNC) &_segmentation_exact_multipcf_, 3},
     {"_segmentation_fast_multipcf_", (DL_FUNC) &_segmentation_fast_multipcf_, 4},
     {"_segmentation_exact_pcf_", (DL_FUNC) &_segmentation_exact_pcf_, 3},
-    {"_segmentation_pelt_pcf_", (DL_FUNC) &_segmentation_pelt_pcf_, 3},
+    {"_segmentation_pelt_pcf_", (DL_FUNC) &_segmentation_pelt_pcf_, 4},
     {"_segmentation_fast_pcf_", (DL_FUNC) &_segmentation_fast_pcf_, 4},
     {"_segmentation_convolve_", (DL_FUNC) &_segmentation_convolve_, 2},
     {"_segmentation_median_", (DL_FUNC) &_segmentation_median_, 1},

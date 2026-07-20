@@ -7,3 +7,6 @@
 .Rproj.user
 .Rhistory
 .RData
+
+.clang-format
+compile_commands.json
