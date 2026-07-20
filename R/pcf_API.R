@@ -235,3 +235,44 @@ expanding_fast_multipcf <- function(x, mark, kmin, gamma, w = NULL) {
     }))
     list(starts = starts, ends = ends, lengths = lengths, means = means)
 }
+
+#' Pruned Exact Linear Time optimisation of PCF
+#' @param x Vector of data to segment
+#' @param kmin Minimum segment size
+#' @param gamma Penalty term added for each new segment. Higher values, fewer segments.
+#' @returns List of starts, ends and lengths of segments, and the mean value of x within each.
+#' @export
+pelt_pcf <- function(x, kmin, gamma) {
+    sd <- getMad(x, 25)
+    adjusted_gamma <- gamma * sd * sd
+    starts <- pelt_pcf_(x, kmin, adjusted_gamma, integer(0)) + 1
+    ends <- c(starts[starts > 1] - 1, length(x))
+    lengths <- ends - starts + 1
+    means <- sapply(seq_along(starts), function(i) {
+        mean(x[starts[i]:ends[i]])
+    })
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
+
+#' Pruned Exact Linear Time optimisation of Multi PCF
+#' @param x Matrix of values to segment, samples in columns
+#' @param kmin Minimum segment size
+#' @param gamma Penalty term added for each new segment. High values, few segments.
+#' @param w Optional vector of weights to apply to the columns of x, to up- or down-weight the constribution of each sample to the result.
+#' @returns List of starts, ends and lengths of segments, and the mean value of x within each.
+#' @export
+pelt_multipcf <- function(x, kmin, gamma, w = NULL) {
+    sds <- apply(x, 2, getMad, k = 25)
+    x_ <- sweep(x, 2, sds, "/")
+    if (!is.null(w)) {
+        x_ <- sweep(x_, 2, w, "*")
+    }
+    adjusted_gamma <- ncol(x) * gamma
+    starts <- pelt_multipcf_(x_, kmin, adjusted_gamma) + 1
+    ends <- c(starts[starts > 1] - 1, nrow(x))
+    lengths <- ends - starts + 1
+    means <- t(sapply(seq_along(starts), function(i) {
+        colMeans(x[starts[i]:ends[i], ])
+    }))
+    list(starts = starts, ends = ends, lengths = lengths, means = means)
+}
