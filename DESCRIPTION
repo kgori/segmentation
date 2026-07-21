@@ -1,8 +1,8 @@
 Package: segmentation
 Type: Package
 Title: Implements PCF and MultiPCF for segmentation of sequence data
-Version: 2.0
-Date: 2026-07-20
+Version: 2.1
+Date: 2026-07-21
 Author: Kevin Gori
 Maintainer: Kevin Gori <kcg25@cam.ac.uk>
 Description: "segmentation" reimplements the PCF and MultiPCF algorithms from the package "copynumber", but uses C++ to increase speed and decrease memory requirements.
