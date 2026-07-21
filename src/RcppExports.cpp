@@ -11,8 +11,8 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // pelt_pcf_
-std::vector<int> pelt_pcf_(const std::vector<double>& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints);
-RcppExport SEXP _segmentation_pelt_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP) {
+std::vector<int> pelt_pcf_(const std::vector<double>& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
+RcppExport SEXP _segmentation_pelt_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP, SEXP constrain_integerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -20,13 +20,14 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     Rcpp::traits::input_parameter< const std::vector<int>& >::type allowed_breakpoints(allowed_breakpointsSEXP);
-    rcpp_result_gen = Rcpp::wrap(pelt_pcf_(y, kmin, gamma, allowed_breakpoints));
+    Rcpp::traits::input_parameter< bool >::type constrain_integer(constrain_integerSEXP);
+    rcpp_result_gen = Rcpp::wrap(pelt_pcf_(y, kmin, gamma, allowed_breakpoints, constrain_integer));
     return rcpp_result_gen;
 END_RCPP
 }
 // pelt_multipcf_
-std::vector<int> pelt_multipcf_(const NumericMatrix& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints);
-RcppExport SEXP _segmentation_pelt_multipcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP) {
+std::vector<int> pelt_multipcf_(const NumericMatrix& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
+RcppExport SEXP _segmentation_pelt_multipcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP, SEXP constrain_integerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
     Rcpp::RNGScope rcpp_rngScope_gen;
@@ -34,14 +35,15 @@ BEGIN_RCPP
     Rcpp::traits::input_parameter< int >::type kmin(kminSEXP);
     Rcpp::traits::input_parameter< double >::type gamma(gammaSEXP);
     Rcpp::traits::input_parameter< const std::vector<int>& >::type allowed_breakpoints(allowed_breakpointsSEXP);
-    rcpp_result_gen = Rcpp::wrap(pelt_multipcf_(y, kmin, gamma, allowed_breakpoints));
+    Rcpp::traits::input_parameter< bool >::type constrain_integer(constrain_integerSEXP);
+    rcpp_result_gen = Rcpp::wrap(pelt_multipcf_(y, kmin, gamma, allowed_breakpoints, constrain_integer));
     return rcpp_result_gen;
 END_RCPP
 }
 
 static const R_CallMethodDef CallEntries[] = {
-    {"_segmentation_pelt_pcf_", (DL_FUNC) &_segmentation_pelt_pcf_, 4},
-    {"_segmentation_pelt_multipcf_", (DL_FUNC) &_segmentation_pelt_multipcf_, 4},
+    {"_segmentation_pelt_pcf_", (DL_FUNC) &_segmentation_pelt_pcf_, 5},
+    {"_segmentation_pelt_multipcf_", (DL_FUNC) &_segmentation_pelt_multipcf_, 5},
     {NULL, NULL, 0}
 };
 

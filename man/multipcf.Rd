@@ -4,7 +4,7 @@
 \alias{multipcf}
 \title{MultiPCF - piecewise constant function fitting algorithm for 2-dimensional data.}
 \usage{
-multipcf(x, kmin, gamma, bks = NULL, w = NULL)
+multipcf(x, kmin, gamma, bks = NULL, w = NULL, integer_constraint = FALSE)
 }
 \arguments{
 \item{x}{Matrix of values to segment, samples in columns}

@@ -13,9 +13,18 @@ std::vector<double> make_prefix_sums(const std::vector<double>& x) {
     return cumulative_sum;
 }
 
+std::vector<double> make_prefix_sums_of_squares(const std::vector<double> &x) {
+    const std::size_t N = x.size();
+    std::vector<double> cumulative_sum(N + 1, 0.0);
+    for (std::size_t i = 0; i < N; ++i) {
+        cumulative_sum[i + 1] = cumulative_sum[i] + x[i] * x[i];
+    }
+    return cumulative_sum;
+}
+
 // [[Rcpp::export]]
 std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
-                           const std::vector<int>& allowed_breakpoints) {
+                           const std::vector<int>& allowed_breakpoints, bool constrain_integer = false) {
     if (kmin < 1) {
         Rcpp::stop("kmin must be at least 1");
     }
@@ -35,6 +44,7 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
 
     // Difference from exact: A is now a prefix sum vector so we can compute the sum for any size segment in O(1) time.
     std::vector<double> A = make_prefix_sums(y);
+    std::vector<double> A2 = make_prefix_sums_of_squares(y);
     // Difference from exact: no need for score vector S
     // Difference from exact: E is now initialized to infinity so that we can prune the search space.
     std::vector<double> E(N + 1, std::numeric_limits<double>::infinity());
@@ -73,7 +83,19 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
             }
 
             const double sum = A[end] - A[j];
-            const double D = -sum * sum / static_cast<double>(end - j);
+            std::size_t len = end - j;
+            double D;
+
+            if (constrain_integer) {
+                // If we want to constrain the mean to be an integer, we can round the mean and compute the cost accordingly
+                const double sum2 = A2[end] - A2[j];
+                double mean = sum / static_cast<double>(len);
+                double rounded_mean = std::round(mean);
+                D = sum2 - 2 * rounded_mean * sum + len * rounded_mean * rounded_mean;
+            } else {
+                D = -sum * sum / static_cast<double>(end - j);
+            }
+            
             const double score = D + E[j] + gamma;
 
             if (score < min_value) {
@@ -103,9 +125,19 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
 
             // Fix the pruning reference point to be kmin size away from the end ("delayed pruning")
             const std::size_t ref = end - kmin_size + 1;
+            const std::size_t len = ref - j;
 
             const double sum = A[ref] - A[j];
-            const double D = -sum * sum / static_cast<double>(ref - j);
+            double D;
+
+            if (constrain_integer) {
+                const double sum2 = A2[ref] - A2[j];
+                double mean = sum / static_cast<double>(len);
+                double rounded_mean = std::round(mean);
+                D = sum2 - 2 * rounded_mean * sum + len * rounded_mean * rounded_mean;
+            } else {
+                D = -sum * sum / static_cast<double>(len);
+            }
 
             if (E[j] + D <= E[ref] + EPSILON) {
                 R_new.push_back(j);
@@ -135,7 +167,7 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
 
 // [[Rcpp::export]]
 std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
-                                const std::vector<int>& allowed_breakpoints) {
+                                const std::vector<int>& allowed_breakpoints, bool constrain_integer = false) {
     if (kmin < 1) {
         Rcpp::stop("kmin must be at least 1");
     }
@@ -149,10 +181,15 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
     }
 
     // A is a matrix of per-sample prefix sums (stored contiguously as a vector)
+    // A2 is a matrix of per-sample prefix sums of squares (stored contiguously as a vector)
     std::vector<double> A((N + 1) * samples, 0.0);
+    std::vector<double> A2((N + 1) * samples, 0.0);
     for (std::size_t i = 0; i < N; ++i) {
+        auto row = y.row(i);
         for (std::size_t s = 0; s < samples; ++s) {
-            A[(i + 1) * samples + s] = A[i * samples + s] + y(i, s);
+            const double value = row[s];
+            A[(i + 1) * samples + s] = A[i * samples + s] + value;
+            A2[(i + 1) * samples + s] = A2[i * samples + s] + value * value;
         }
     }
     std::vector<double> E(N + 1, std::numeric_limits<double>::infinity());
@@ -188,16 +225,28 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
                 continue; // Skip if the segment is too short
             }
 
-            double sum_of_squares = 0.0;
+            double cost = 0.0;
+            double score;
 
-            for (std::size_t s = 0; s < samples; ++s) {
-                const double sum = A[end * samples + s] - A[j * samples + s];
-                sum_of_squares += sum * sum;
+            const std::size_t len = end - j;
+
+            if (constrain_integer) {
+                for (std::size_t s = 0; s < samples; ++s) {
+                    const double sum = A[end * samples + s] - A[j * samples + s];
+                    const double sum2 = A2[end * samples + s] - A2[j * samples + s];
+                    double mean = sum / static_cast<double>(len);
+                    double rounded_mean = std::round(mean);
+                    cost += sum2 - 2 * rounded_mean * sum + len * rounded_mean * rounded_mean;
+                }
+                score = cost + E[j] + gamma;
+            } else {
+                for (std::size_t s = 0; s < samples; ++s) {
+                    const double sum = A[end * samples + s] - A[j * samples + s];
+                    cost += sum * sum;
+                }
+                score = -cost / static_cast<double>(len) + E[j] + gamma;
             }
-
-            const double D = -sum_of_squares / static_cast<double>(end - j);
-            const double score = D + E[j] + gamma;
-
+            
             if (score < min_value) {
                 min_value = score;
                 min_position = static_cast<int>(j);
@@ -222,14 +271,26 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
 
             // Fix the pruning reference point to be kmin size away from the end ("delayed pruning")
             const std::size_t ref = end - kmin_size + 1;
+            const std::size_t len = ref - j;
 
-            double sum_of_squares = 0.0;
-            for (std::size_t s = 0; s < samples; ++s) {
-                const double sum = A[ref * samples + s] - A[j * samples + s];
-                sum_of_squares += sum * sum;
+            double cost = 0.0;
+            double D;
+            if (constrain_integer) {
+                for (std::size_t s = 0; s < samples; ++s) {
+                    const double sum = A[ref * samples + s] - A[j * samples + s];
+                    const double sum2 = A2[ref * samples + s] - A2[j * samples + s];
+                    double mean = sum / static_cast<double>(len);
+                    double rounded_mean = std::round(mean);
+                    cost += sum2 - 2 * rounded_mean * sum + len * rounded_mean * rounded_mean;
+                }
+                D = cost;
+            } else {
+                for (std::size_t s = 0; s < samples; ++s) {
+                    const double sum = A[ref * samples + s] - A[j * samples + s];
+                    cost += sum * sum;
+                }
+                D = -cost / static_cast<double>(len);
             }
-
-            const double D = -sum_of_squares / static_cast<double>(ref - j);
 
             if (E[j] + D <= E[ref] + EPSILON) {
                 R_new.push_back(j);
@@ -254,6 +315,7 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
     }
     starts.push_back(0);
     std::reverse(starts.begin(), starts.end());
+
     return starts;
 }
 

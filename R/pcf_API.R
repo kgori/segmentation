@@ -11,13 +11,13 @@
 #' @param bks Constrain the start indices of the result to be drawn from this vector.
 #' @returns List of starts, ends and lengths of segments, and the mean value of x within each.
 #' @export
-pcf <- function(x, kmin, gamma, bks = NULL) {
+pcf <- function(x, kmin, gamma, bks = NULL, integer_constraint = FALSE) {
     if (is.null(bks)) {
         bks <- integer(0)
     } else {
         bks <- bks - 1 # convert 1-based to 0-based
     }
-    starts <- pelt_pcf_(x, kmin, gamma, bks) + 1
+    starts <- pelt_pcf_(x, kmin, gamma, bks, integer_constraint) + 1
     ends <- c(starts[starts > 1] - 1, length(x))
     lengths <- ends - starts + 1
     means <- sapply(seq_along(starts), function(i) {
@@ -41,7 +41,7 @@ pcf <- function(x, kmin, gamma, bks = NULL) {
 #' @param w Optional vector of weights to apply to the columns of x, to up- or down-weight the contribution of each sample to the result.
 #' @returns List of starts, ends and lengths of segments, and the mean value of x within each.
 #' @export
-multipcf <- function(x, kmin, gamma, bks = NULL, w = NULL) {
+multipcf <- function(x, kmin, gamma, bks = NULL, w = NULL, integer_constraint = FALSE) {
     if (!is.null(w)) {
         stopifnot(all(w > 0))
         x <- sweep(x, 2, w, "*")
@@ -51,7 +51,7 @@ multipcf <- function(x, kmin, gamma, bks = NULL, w = NULL) {
     } else {
         bks <- bks - 1 # convert 1-based to 0-based
     }
-    starts <- pelt_multipcf_(x, kmin, gamma, bks) + 1
+    starts <- pelt_multipcf_(x, kmin, gamma, bks, integer_constraint) + 1
     ends <- c(starts[starts > 1] - 1, nrow(x))
     lengths <- ends - starts + 1
     means <- t(sapply(seq_along(starts), function(i) {

@@ -4,7 +4,7 @@
 \alias{pcf}
 \title{PCF - piecewise constant function fitting algorithm for 1-dimensional data.}
 \usage{
-pcf(x, kmin, gamma, bks = NULL)
+pcf(x, kmin, gamma, bks = NULL, integer_constraint = FALSE)
 }
 \arguments{
 \item{x}{Vector of data to segment}
