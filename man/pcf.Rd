@@ -2,17 +2,26 @@
 % Please edit documentation in R/pcf_API.R
 \name{pcf}
 \alias{pcf}
-\title{Segment a single sample using the PCF algorithm.}
+\title{PCF - piecewise constant function fitting algorithm for 1-dimensional data.}
 \usage{
-pcf(x, kmin, gamma)
+pcf(x, kmin, gamma, bks = NULL)
 }
 \arguments{
-\item{x}{Vector of observations}
+\item{x}{Vector of data to segment}
 
-\item{kmin}{Minimum number of data points permitted in a single segment}
+\item{kmin}{Minimum segment size}
 
-\item{gamma}{Penalty parameter. Higher values produce fewer segments.}
+\item{gamma}{Penalty term added for each new segment. Higher values produce fewer segments.}
+
+\item{bks}{Constrain the start indices of the result to be drawn from this vector.}
+}
+\value{
+List of starts, ends and lengths of segments, and the mean value of x within each.
 }
 \description{
-Segment a single sample using the PCF algorithm.
+Uses PELT (pruned exact linear time) optimisation for best case O(n), worst case O(n^2) time complexity.
+Returns a list of segment starts, ends and widths, and within segment means.
+Optionally, constrain segment starts to be drawn from a vector of preselected indices.
+NB: Indices are 1-based.
+    Segments are half-open intervals [start, end).
 }

@@ -1,7 +1,7 @@
 Package: segmentation
 Type: Package
 Title: Implements PCF and MultiPCF for segmentation of sequence data
-Version: 1.1
+Version: 2.0
 Date: 2026-07-20
 Author: Kevin Gori
 Maintainer: Kevin Gori <kcg25@cam.ac.uk>

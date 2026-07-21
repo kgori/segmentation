@@ -2,20 +2,29 @@
 % Please edit documentation in R/pcf_API.R
 \name{multipcf}
 \alias{multipcf}
-\title{Segment multiple samples simultaneously using the MultiPCF algorithm.}
+\title{MultiPCF - piecewise constant function fitting algorithm for 2-dimensional data.}
 \usage{
-multipcf(x, gamma, w = NULL)
+multipcf(x, kmin, gamma, bks = NULL, w = NULL)
 }
 \arguments{
-\item{x}{Matrix of observations (samples arranged as columns)}
+\item{x}{Matrix of values to segment, samples in columns}
 
-\item{gamma}{Penalty parameter. Higher values produce fewer segments.}
+\item{kmin}{Minimum segment size}
 
-\item{w}{Optional vector of weights to apply to the data before segmenting.
-Allows down-weighting of noisy samples to avoid them contributing excessively
-and causing the result to be over-segmented. Must be a numeric vector the same
-length as the number of columns of x.}
+\item{gamma}{Penalty term added for each new segment. Higher values produce fewer segments.}
+
+\item{bks}{Constrain the start indices of the result to be drawn from this vector.}
+
+\item{w}{Optional vector of weights to apply to the columns of x, to up- or down-weight the contribution of each sample to the result.}
+}
+\value{
+List of starts, ends and lengths of segments, and the mean value of x within each.
 }
 \description{
-Segment multiple samples simultaneously using the MultiPCF algorithm.
+Uses PELT (pruned exact linear time) optimisation for best case O(n), worst case O(n^2) time complexity.
+Returns a list of segment starts, ends and widths, and within segment means for each column.
+Optionally, constrain segment starts to be drawn from a vector of preselected indices.
+NB: Input data has observations in rows, samples in columns.
+    Indices are 1-based.
+    Segments are half-open intervals [start, end).
 }
