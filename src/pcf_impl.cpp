@@ -24,9 +24,9 @@ std::vector<double> make_prefix_sums_of_squares(const std::vector<double> &x) {
 }
 
 // [[Rcpp::export]]
-std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
-                           const std::vector<int> &allowed_breakpoints,
-                           bool constrain_integer = false) {
+List pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
+               const std::vector<int> &allowed_breakpoints,
+               bool constrain_integer = false) {
     if (kmin < 1) {
         Rcpp::stop("kmin must be at least 1");
     }
@@ -39,7 +39,8 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
     std::size_t kmin_size = static_cast<std::size_t>(kmin);
 
     if (N == 0) {
-        return {};
+        return List::create(_["starts"] = IntegerVector(),
+                            _["means"] = NumericVector());
     }
 
     for (const auto &bp : allowed_breakpoints) {
@@ -58,6 +59,7 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
     // prune the search space.
     std::vector<double> E(N + 1, std::numeric_limits<double>::infinity());
     std::vector<int> T(N, -1);
+    std::vector<double> M(N);
 
     // Construct the allowed set of breakpoints
     bool restrict_breakpoints = !allowed_breakpoints.empty();
@@ -78,6 +80,7 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
         const std::size_t end = k + 1;
         double min_value = std::numeric_limits<double>::infinity();
         int min_position = -1;
+        double min_mean = 0.0;
 
         // Difference from exact: Iterate only over candidates, not all j
         for (const std::size_t j : R) {
@@ -97,17 +100,18 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
             const double sum = A[end] - A[j];
             std::size_t len = end - j;
             double D;
+            double segment_mean;
 
             if (constrain_integer) {
                 // If we want to constrain the mean to be an integer, we can
                 // round the mean and compute the cost accordingly
                 const double sum2 = A2[end] - A2[j];
-                double mean = sum / static_cast<double>(len);
-                double rounded_mean = std::round(mean);
-                D = sum2 - 2 * rounded_mean * sum +
-                    len * rounded_mean * rounded_mean;
+                segment_mean = std::round(sum / static_cast<double>(len));
+                D = sum2 - 2 * segment_mean * sum +
+                    len * segment_mean * segment_mean;
             } else {
                 D = -sum * sum / static_cast<double>(end - j);
+                segment_mean = sum / static_cast<double>(len);
             }
 
             const double score = D + E[j] + gamma;
@@ -115,11 +119,13 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
             if (score < min_value) {
                 min_value = score;
                 min_position = static_cast<int>(j);
+                min_mean = segment_mean;
             }
         }
 
         E[end] = min_value;
         T[k] = min_position;
+        M[k] = min_mean;
 
         // Difference from exact: Prune the candidate set R based on the pruning
         // condition: only keep candidates j for which E[j] + D <= E[end]
@@ -172,20 +178,26 @@ std::vector<int> pelt_pcf_(const std::vector<double> &y, int kmin, double gamma,
 
     // Find start positions
     std::vector<int> starts;
+    std::vector<double> means;
     int pos = T.back();
+    std::size_t end = N;
     while (pos > 0) {
         starts.push_back(pos);
+        means.push_back(M[end - 1]);
+        end = static_cast<std::size_t>(pos);
         pos = T[pos - 1];
     }
     starts.push_back(0);
+    means.push_back(M[end - 1]);
     std::reverse(starts.begin(), starts.end());
-    return starts;
+    std::reverse(means.begin(), means.end());
+    return List::create(_["starts"] = starts, _["means"] = means);
 }
 
 // [[Rcpp::export]]
-std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
-                                const std::vector<int> &allowed_breakpoints,
-                                bool constrain_integer = false) {
+List pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
+                    const std::vector<int> &allowed_breakpoints,
+                    bool constrain_integer = false) {
     if (kmin < 1) {
         Rcpp::stop("kmin must be at least 1");
     }
@@ -199,7 +211,8 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
     std::size_t kmin_size = static_cast<std::size_t>(kmin);
 
     if (N == 0 || samples == 0) {
-        return {};
+        return List::create(_["starts"] = IntegerVector(),
+                            _["means"] = NumericMatrix(0, samples));
     }
 
     // A is a matrix of per-sample prefix sums (stored contiguously as a vector)
@@ -217,6 +230,7 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
     }
     std::vector<double> E(N + 1, std::numeric_limits<double>::infinity());
     std::vector<int> T(N, -1);
+    NumericMatrix M(N, samples);
 
     // Construct the allowed set of breakpoints
     bool restrict_breakpoints = !allowed_breakpoints.empty();
@@ -235,6 +249,7 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
 
         double min_value = std::numeric_limits<double>::infinity();
         int min_position = -1;
+        NumericVector min_means(samples);
 
         for (const std::size_t j : R) {
             if (restrict_breakpoints && !allowed_set.count(j)) {
@@ -252,6 +267,7 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
 
             double cost = 0.0;
             double score;
+            NumericVector segment_means(samples);
 
             const std::size_t len = end - j;
 
@@ -261,10 +277,10 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
                         A[end * samples + s] - A[j * samples + s];
                     const double sum2 =
                         A2[end * samples + s] - A2[j * samples + s];
-                    double mean = sum / static_cast<double>(len);
-                    double rounded_mean = std::round(mean);
-                    cost += sum2 - 2 * rounded_mean * sum +
-                            len * rounded_mean * rounded_mean;
+                    segment_means[s] =
+                        std::round(sum / static_cast<double>(len));
+                    cost += sum2 - 2 * segment_means[s] * sum +
+                            len * segment_means[s] * segment_means[s];
                 }
                 score = cost + E[j] + gamma;
             } else {
@@ -272,6 +288,7 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
                     const double sum =
                         A[end * samples + s] - A[j * samples + s];
                     cost += sum * sum;
+                    segment_means[s] = sum / static_cast<double>(len);
                 }
                 score = -cost / static_cast<double>(len) + E[j] + gamma;
             }
@@ -279,11 +296,15 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
             if (score < min_value) {
                 min_value = score;
                 min_position = static_cast<int>(j);
+                min_means = segment_means;
             }
         }
 
         E[end] = min_value;
         T[k] = min_position;
+        for (std::size_t s = 0; s < samples; ++s) {
+            M(k, s) = min_means[s];
+        }
 
         std::vector<std::size_t> R_new;
         R_new.reserve(R.size() + 1);
@@ -342,13 +363,25 @@ std::vector<int> pelt_multipcf_(const NumericMatrix &y, int kmin, double gamma,
 
     // Find start positions
     std::vector<int> starts;
+    std::vector<std::size_t> mean_rows;
     int pos = T.back();
+    std::size_t end = N;
     while (pos > 0) {
         starts.push_back(pos);
+        mean_rows.push_back(end - 1);
+        end = static_cast<std::size_t>(pos);
         pos = T[pos - 1];
     }
     starts.push_back(0);
+    mean_rows.push_back(end - 1);
     std::reverse(starts.begin(), starts.end());
+    std::reverse(mean_rows.begin(), mean_rows.end());
+    NumericMatrix means(starts.size(), samples);
+    for (std::size_t i = 0; i < mean_rows.size(); ++i) {
+        for (std::size_t s = 0; s < samples; ++s) {
+            means(i, s) = M(mean_rows[i], s);
+        }
+    }
 
-    return starts;
+    return List::create(_["starts"] = starts, _["means"] = means);
 }

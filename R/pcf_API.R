@@ -17,12 +17,11 @@ pcf <- function(x, kmin, gamma, bks = NULL, integer_constraint = FALSE) {
     } else {
         bks <- bks - 1 # convert 1-based to 0-based
     }
-    starts <- pelt_pcf_(x, kmin, gamma, bks, integer_constraint) + 1
+    result <- pelt_pcf_(x, kmin, gamma, bks, integer_constraint)
+    starts <- result$starts + 1
     ends <- c(starts[starts > 1] - 1, length(x))
     lengths <- ends - starts + 1
-    means <- sapply(seq_along(starts), function(i) {
-        mean(x[starts[i]:ends[i]])
-    })
+    means <- result$means
     list(starts = starts, ends = ends, lengths = lengths, means = means)
 }
 
@@ -51,12 +50,11 @@ multipcf <- function(x, kmin, gamma, bks = NULL, w = NULL, integer_constraint = 
     } else {
         bks <- bks - 1 # convert 1-based to 0-based
     }
-    starts <- pelt_multipcf_(x, kmin, gamma, bks, integer_constraint) + 1
+    result <- pelt_multipcf_(x, kmin, gamma, bks, integer_constraint)
+    starts <- result$starts + 1
     ends <- c(starts[starts > 1] - 1, nrow(x))
     lengths <- ends - starts + 1
-    means <- t(sapply(seq_along(starts), function(i) {
-        colMeans(x[starts[i]:ends[i], ])
-    }))
+    means <- result$means
     list(starts = starts, ends = ends, lengths = lengths, means = means)
 }
 

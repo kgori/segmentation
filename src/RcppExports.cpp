@@ -11,7 +11,7 @@ Rcpp::Rostream<false>& Rcpp::Rcerr = Rcpp::Rcpp_cerr_get();
 #endif
 
 // pelt_pcf_
-std::vector<int> pelt_pcf_(const std::vector<double>& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
+List pelt_pcf_(const std::vector<double>& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
 RcppExport SEXP _segmentation_pelt_pcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP, SEXP constrain_integerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
@@ -26,7 +26,7 @@ BEGIN_RCPP
 END_RCPP
 }
 // pelt_multipcf_
-std::vector<int> pelt_multipcf_(const NumericMatrix& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
+List pelt_multipcf_(const NumericMatrix& y, int kmin, double gamma, const std::vector<int>& allowed_breakpoints, bool constrain_integer);
 RcppExport SEXP _segmentation_pelt_multipcf_(SEXP ySEXP, SEXP kminSEXP, SEXP gammaSEXP, SEXP allowed_breakpointsSEXP, SEXP constrain_integerSEXP) {
 BEGIN_RCPP
     Rcpp::RObject rcpp_result_gen;
